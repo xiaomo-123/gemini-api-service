@@ -1,0 +1,1024 @@
+const axios = require('axios');
+const puppeteer = require('puppeteer');
+const { loadGeminiMailConfig, saveGeminiMailConfig, getProxyConfig, getEmailCredentials } = require('../utils/config');
+const { getEmailList } = require('./emailService');
+const logger = require('../utils/logger');
+
+// 从配置文件获取邮箱 API URL
+const { emailApiUrl } = getEmailCredentials();
+const EMAIL_LIST_URL = `${emailApiUrl}/api/email/list`;
+
+/**
+ * 确保 fetch API 可用
+ */
+function ensureFetchAvailable() {
+  if (typeof globalThis.fetch !== "function") {
+    throw new Error("当前 Node 版本不支持全局 fetch，请使用 Node 18+ 或自行 polyfill fetch");
+  }
+}
+
+/**
+ * 从邮件文本中提取 Gemini 验证码
+ * @param {string} text - 邮件正文
+ * @returns {string|null} 验证码或 null
+ */
+function extractGeminiVerificationCode(text) {
+  // 匹配 "您的一次性验证码为：\n\nXXXXXX" 格式
+  const match = text.match(/您的一次性验证码为：\s*\n\s*\n\s*([A-Z0-9]{6})/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * 获取指定账号的最新邮件列表
+ * @param {string} token - 已登录的会话令牌
+ * @param {number} accountId - 账号ID
+ * @param {number} size - 获取邮件数量（默认5）
+ * @returns {Promise<Object>} 邮件列表数据
+ */
+async function fetchEmailList(token, accountId, size = 5) {
+  ensureFetchAvailable();
+
+  const url = `${EMAIL_LIST_URL}?accountId=${accountId}&emailId=0&timeSort=0&size=${size}&type=0`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Authorization": token,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`获取邮件列表失败，HTTP 状态码 ${response.status}`);
+  }
+
+  const payloadText = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(payloadText);
+  } catch (error) {
+    throw new Error(`邮件列表响应无法解析为 JSON: ${error.message}`);
+  }
+
+  if (payload.code !== 200) {
+    throw new Error(`获取邮件列表失败: ${payload.message || "未知错误"}`);
+  }
+
+  return payload.data;
+}
+
+/**
+ * 查找最新的 Gemini 验证码邮件
+ * @param {Array} emailList - 邮件列表
+ * @returns {string|null} 验证码或 null
+ */
+function findGeminiVerificationCode(emailList) {
+  if (!emailList || emailList.length === 0) {
+    return null;
+  }
+
+  // 遍历邮件列表，查找 Gemini Business 验证码邮件
+  for (const email of emailList) {
+    if (email.subject === "Gemini Business 验证码") {
+      const code = extractGeminiVerificationCode(email.text);
+      if (code) {
+        return code;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 等待并获取 Gemini 验证码（最多重试5次，每次等待5秒）
+ * @param {string} token - 已登录的会话令牌
+ * @param {number} accountId - 账号ID
+ * @returns {Promise<string>} 验证码
+ */
+async function waitForGeminiVerificationCode(token, accountId) {
+  const maxRetries = 5;
+  const retryDelay = 5000; // 5秒
+
+  for (let i = 0; i < maxRetries; i++) {
+    logger.info(`   ⏳ 正在获取验证码... (尝试 ${i + 1}/${maxRetries})`);
+
+    try {
+      const emailData = await fetchEmailList(token, accountId, 5);
+
+      if (emailData.list && emailData.list.length > 0) {
+        const code = findGeminiVerificationCode(emailData.list);
+        if (code) {
+          logger.info(`   ✓ 成功获取验证码: ${code}`);
+          return code;
+        }
+      }
+    } catch (error) {
+      logger.info(`   ⚠️  获取邮件失败: ${error.message}`);
+    }
+
+    if (i < maxRetries - 1) {
+      logger.info(`   ⏳ 未找到验证码，等待 5 秒后重试...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+
+  throw new Error("未能在规定时间内获取到验证码");
+}
+
+/**
+ * 登录Gemini Pool平台
+ */
+async function loginGeminiPool(poolApiUrl, password) {
+  try {
+    logger.info('正在登录 Gemini Pool 平台...');
+    
+    const response = await axios.post(`${poolApiUrl}/api/auth/login`, {
+      password: password
+    });
+
+    if (response.data && response.data.token) {
+      logger.info('登录成功！');
+      return response.data.token;
+    } else {
+      throw new Error('登录响应中没有 token');
+    }
+  } catch (error) {
+    logger.error('登录失败:', error.message);
+    if (error.response) {
+      logger.error('响应状态:', error.response.status);
+      logger.error('响应数据:', error.response.data);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 获取Gemini Pool平台上的所有账户
+ */
+async function getPoolAccounts(poolApiUrl, adminToken) {
+  try {
+    logger.info('正在获取平台账户列表...');
+
+    const response = await axios.get(`${poolApiUrl}/api/accounts`, {
+      headers: {
+        'x-admin-token': adminToken
+      }
+    });
+
+    if (response.data && response.data.accounts) {
+      logger.info(`找到 ${response.data.accounts.length} 个平台账户`);
+      return response.data.accounts;
+    } else {
+      throw new Error('获取账户列表失败');
+    }
+  } catch (error) {
+    logger.error(`获取平台账户失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 测试单个账户是否可用
+ */
+async function testAccount(poolApiUrl, accountId, adminToken) {
+  try {
+    const response = await axios.get(`${poolApiUrl}/api/accounts/${accountId}/test`, {
+      headers: {
+        'x-admin-token': adminToken
+      }
+    });
+
+    return response.data && response.data.success === true;
+  } catch (error) {
+    logger.error(`测试账户 ${accountId} 失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 删除账户
+ */
+async function deleteAccount(poolApiUrl, accountId, adminToken) {
+  try {
+    const response = await axios.delete(`${poolApiUrl}/api/accounts/${accountId}`, {
+      headers: {
+        'x-admin-token': adminToken
+      }
+    });
+
+    // 检查多种成功情况：success 为 true，或者 HTTP 状态码为 2xx
+    return (response.data && response.data.success === true) ||
+           (response.status >= 200 && response.status < 300);
+  } catch (error) {
+    // 如果是 404 错误（账户不存在），也视为删除成功
+    if (error.response && error.response.status === 404) {
+      return true;
+    }
+    logger.error(`删除账户 ${accountId} 失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 添加新账户到平台
+ */
+async function addAccount(poolApiUrl, accountData, adminToken) {
+  try {
+    const response = await axios.post(`${poolApiUrl}/api/accounts`, {
+      team_id: accountData.team_id,
+      secure_c_ses: accountData.secure_c_ses,
+      host_c_oses: accountData.host_c_oses,
+      csesidx: accountData.csesidx,
+      user_agent: accountData.user_agent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+    }, {
+      headers: {
+        'x-admin-token': adminToken
+      }
+    });
+
+    return response.data && response.data.success === true;
+  } catch (error) {
+    logger.error(`添加账户失败: ${error.message}`);
+    if (error.response) {
+      logger.error(`响应数据: ${JSON.stringify(error.response.data)}`);
+    }
+    return false;
+  }
+}
+
+/**
+ * 从邮件文本中提取 Gemini 验证码
+ */
+function extractGeminiVerificationCode(text) {
+  // 匹配 "您的一次性验证码为：\n\nXXXXXX" 格式
+  const match = text.match(/您的一次性验证码为：\s*\n\s*\n\s*([A-Z0-9]{6})/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * 查找最新的 Gemini 验证码邮件
+ */
+function findGeminiVerificationCode(emailList) {
+  if (!emailList || emailList.length === 0) {
+    return null;
+  }
+
+  // 遍历邮件列表，查找 Gemini Business 验证码邮件
+  for (const email of emailList) {
+    if (email.subject === "Gemini Business 验证码") {
+      const code = extractGeminiVerificationCode(email.text);
+      if (code) {
+        return code;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 等待并获取 Gemini 验证码（最多重试5次，每次等待5秒）
+ */
+async function waitForGeminiVerificationCode(token, accountId) {
+  const maxRetries = 5;
+  const retryDelay = 5000; // 5秒
+
+  for (let i = 0; i < maxRetries; i++) {
+    logger.info(`正在获取验证码... (尝试 ${i + 1}/${maxRetries})`);
+
+    try {
+      const emailData = await getEmailList(token, accountId, 5);
+
+      if (emailData.list && emailData.list.length > 0) {
+        const code = findGeminiVerificationCode(emailData.list);
+        if (code) {
+          logger.info(`成功获取验证码: ${code}`);
+          return code;
+        }
+      }
+    } catch (error) {
+      logger.warn(`获取邮件失败: ${error.message}`);
+    }
+
+    if (i < maxRetries - 1) {
+      logger.info(`未找到验证码，等待 5 秒后重试...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+
+  throw new Error("未能在规定时间内获取到验证码");
+}
+
+/**
+ * 测试代理连接
+ */
+async function testProxyConnection(proxyConfig) {
+  if (!proxyConfig.enabled) {
+    return false;
+  }
+
+  try {
+    // 尝试使用代理直接请求httpbin.org/ip，验证代理是否生效
+    const https = require('https');
+    const url = require('url');
+
+    // 构建目标URL（使用httpbin.org作为测试目标）
+    const targetUrl = 'https://httpbin.org/ip';
+
+    // 配置axios使用代理
+    const axiosConfig = {
+      method: 'get',
+      url: targetUrl,
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: false // 忽略证书验证
+      }),
+      timeout: 15000, // 15秒超时
+      proxy: {
+        protocol: proxyConfig.type,
+        host: proxyConfig.url,
+        port: proxyConfig.port,
+        auth: proxyConfig.username && proxyConfig.password ? {
+          username: proxyConfig.username,
+          password: proxyConfig.password
+        } : undefined
+      }
+    };
+
+    const response = await axios(axiosConfig);
+    const result = response.data;
+
+    // 验证代理是否生效
+    if (result.origin && result.origin !== '127.0.0.1') {
+      logger.info(`代理已生效，IP: ${result.origin}`);
+      return true;
+    } else {
+      logger.warn('代理可能未生效');
+      return false;
+    }
+  } catch (error) {
+    // 如果是网络错误，尝试备用测试方法
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      try {
+        // 使用HTTP CONNECT方法测试代理连接，支持认证
+        const https = require('https');
+        const url = require('url');
+
+        // 构建目标URL（使用httpbin.org作为测试目标）
+        const targetUrl = 'https://httpbin.org/ip';
+        const targetParsed = url.parse(targetUrl);
+
+        // 设置代理选项
+        const proxyOptions = {
+          host: proxyConfig.url,
+          port: proxyConfig.port,
+          method: 'CONNECT',
+          path: `${targetParsed.hostname}:${targetParsed.port || 443}`,
+          headers: {
+            'Host': `${targetParsed.hostname}:${targetParsed.port || 443}`
+          }
+        };
+
+        // 如果有认证信息，添加Proxy-Authorization头
+        if (proxyConfig.username && proxyConfig.password) {
+          const auth = Buffer.from(`${proxyConfig.username}:${proxyConfig.password}`).toString('base64');
+          proxyOptions.headers['Proxy-Authorization'] = `Basic ${auth}`;
+        }
+
+        await new Promise((resolve, reject) => {
+          const req = https.request(proxyOptions);
+
+          req.setTimeout(10000); // 10秒超时
+
+          req.on('connect', (res, socket) => {
+            if (res.statusCode === 200) {
+              logger.info('代理连接成功');
+              socket.end();
+              resolve();
+            } else {
+              logger.error(`代理连接失败，状态码: ${res.statusCode}`);
+              socket.end();
+              reject(new Error(`代理连接失败，状态码: ${res.statusCode}`));
+            }
+          });
+
+          req.on('timeout', () => {
+            logger.error('代理连接超时');
+            req.destroy();
+            reject(new Error('代理连接超时'));
+          });
+
+          req.on('error', (err) => {
+            logger.error(`代理连接失败: ${err.message}`);
+            reject(err);
+          });
+
+          req.end();
+        });
+
+        return true;
+      } catch (backupError) {
+        logger.error(`备用测试方法也失败: ${backupError.message}`);
+        return false;
+      }
+    }
+
+    logger.error(`代理测试失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 登录单个 Gemini 子号并获取 token
+ */
+async function loginGeminiChild(childAccount, token) {
+  logger.info(`\n🔄 正在登录子号: ${childAccount.email}`);
+  logger.info(`   账号ID: ${childAccount.accountId}`);
+  logger.info(`   邮箱: ${childAccount.email}`);
+
+  let browser;
+  try {
+    // 1. 启动浏览器
+    logger.info(`   ⏳ 启动浏览器...`);
+
+    // 获取代理配置
+    const proxyConfig = getProxyConfig();
+    logger.info(`   代理状态: ${proxyConfig.enabled ? '已启用' : '未启用'}`);
+    let launchArgs = []
+    
+    // 如果启用了代理，验证代理并添加代理相关参数
+    if (proxyConfig.enabled) {
+      logger.info(`   代理类型: ${proxyConfig.type}`);
+      logger.info(`   代理地址: ${proxyConfig.url}:${proxyConfig.port}`);
+      logger.info(`   认证信息: ${proxyConfig.username ? '已设置' : '未设置'}`);
+
+      // 根据代理类型构建代理服务器URL
+      let proxyServer;
+      if (proxyConfig.type === 'socks5') {
+        proxyServer = `socks5://${proxyConfig.url}:${proxyConfig.port}`;
+      } else {
+        proxyServer = `${proxyConfig.type}://${proxyConfig.url}:${proxyConfig.port}`;
+      }
+
+      // 验证代理是否可用
+      let proxyValid = false;
+      try {
+        proxyValid = await testProxyConnection(proxyConfig);
+      } catch (error) {
+        logger.info(`   ⚠️ 代理验证出错: ${error.message}`);
+      }
+
+      // 只有在代理验证通过时才添加代理参数
+      if (proxyValid) {
+        // 添加代理参数
+        launchArgs.push(`--proxy-server=${proxyServer}`);
+        logger.info(`   ✓ 已添加代理参数: ${proxyServer}`);
+      } else {
+        logger.info(`   ⚠️ 代理验证失败，将不使用代理继续执行`);
+        logger.info(`   💡 提示: 如果需要使用代理，请检查代理配置或网络连接`);
+      }
+    }
+
+    browser = await puppeteer.launch({
+      headless: false, // 显示浏览器界面，方便调试
+      args: launchArgs,
+      ignoreHTTPSErrors: true // 忽略HTTPS错误
+    });
+
+    const page = await browser.newPage();
+
+    // 设置用户代理，避免被识别为机器人
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+    // 对于HTTP代理，需要单独设置认证信息
+    if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password) {
+      await page.authenticate({
+        username: proxyConfig.username,
+        password: proxyConfig.password
+      });
+      logger.info(`   ✓ 代理认证已设置`);
+    }
+
+    // 2. 访问 Gemini 登录页面
+    logger.info(`   ⏳ 访问 Gemini 登录页面...`);
+    await page.goto('https://auth.business.gemini.google/login?continueUrl=https://business.gemini.google/');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // 3. 填入邮箱
+    logger.info(`   ⏳ 填入邮箱...`);
+    const emailSelector = '#email-input';
+    await page.waitForSelector(emailSelector);
+    await page.type(emailSelector, childAccount.email);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // 4. 点击下一步按钮
+    logger.info(`   ⏳ 点击下一步按钮...`);
+    const nextButtonSelector = '#log-in-button';
+    await page.click(nextButtonSelector);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // 5. 等待验证码输入框出现
+    logger.info(`   ⏳ 等待验证码输入框...`);
+    const verificationCodeSelector = 'input[name="pinInput"]';
+    await page.waitForSelector(verificationCodeSelector);
+
+    // 6. 等待页面加载完毕，给邮件发送留出时间
+    logger.info(`   ⏳ 等待邮件发送（10秒）...`);
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
+    // 7. 自动从邮箱获取验证码
+    logger.info(`   ⏳ 正在从邮箱获取验证码...`);
+    const verificationCode = await waitForGeminiVerificationCode(token, childAccount.accountId);
+
+    // 8. 自动填入验证码
+    logger.info(`   ⏳ 填入验证码...`);
+    // 先点击输入框聚焦
+    await page.click(verificationCodeSelector);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // 清空输入框
+    await page.evaluate((selector) => {
+      document.querySelector(selector).value = '';
+    }, verificationCodeSelector);
+    // 使用 type 方法逐字输入
+    await page.type(verificationCodeSelector, verificationCode, { delay: 100 });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // 9. 点击验证按钮
+    logger.info(`   ⏳ 点击验证按钮...`);
+    const verifyButtonSelector = 'button[aria-label="验证"]';
+    await page.click(verifyButtonSelector);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    logger.info(`   ✓ 验证完成，等待页面跳转...`);
+
+    // 等待页面跳转，处理两种情况：先出现/create然后出现/cid/，或直接出现/cid/
+    logger.info(`   ⏳ 等待页面跳转（最多120秒）...`);
+
+    const maxWaitTime = 60000; // 120秒
+    const startTime = Date.now();
+    let currentUrl = page.url();
+    let hasSeenCreate = currentUrl.includes('/admin/create');
+
+    while ((!currentUrl.includes('/cid/') || currentUrl.includes('/admin/create')) && (Date.now() - startTime) < maxWaitTime) {
+      logger.info(`      当前 URL: ${currentUrl}`);
+
+      if (currentUrl.includes('/create')) {
+        logger.info(`      检测到URL包含/create，等待跳转...`);
+        hasSeenCreate = true;
+        break;
+      } else if (currentUrl.includes('/cid/')) {
+        hasSeenCreate = false;
+        logger.info(`URL包含/cid/，等待跳转...`);
+        break;
+
+      } else {
+        logger.info(`      未知页面...`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      currentUrl = page.url();
+    }
+
+    if (currentUrl.includes('/admin/create')) {
+      logger.info(`   ⚠️ 等待超时，URL仍包含/create，停止执行`);
+
+      // 11. 填入名称
+      logger.info(`   ⏳ 填入名称...`);
+      const nameSelector = '#mat-input-0';
+      await page.waitForSelector(nameSelector);
+      await page.type(nameSelector, childAccount.email);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+     // 9. 点击按钮
+      logger.info(`   ⏳ 点击按钮...`);
+      const ButtonSelector = 'body > saasfe-root > main > saasfe-onboard-component > div > div > div > form > button > span.mdc-button__label';
+      await page.click(ButtonSelector)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const startTime1 = Date.now();
+      let currentUrl1 = page.url();
+
+      while (!currentUrl1.includes('/cid/') && (Date.now() - startTime1) < maxWaitTime) {
+        logger.info(`      当前 URL: ${currentUrl1}`);
+        logger.info(`      等待跳转到聊天页面...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        currentUrl = page.url();
+      }
+       // 再等待一段时间确保页面完全加载
+      logger.info(`   ⏳ 页面已跳转，等待完全加载（10秒）...`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      // 11. 获取 4 个 token
+      logger.info(`   ⏳ 获取 token...`);
+
+      try {
+        const tokens = await getLoginTokens(page);
+        // 使用获取到的 tokens 进行后续操作
+        logger.info('获取到的 tokens:', tokens);
+        return tokens;
+      } catch (error) {
+        logger.error('获取 tokens 失败:', error.message);
+        // 处理错误情况
+      }
+    }else{
+       // 再等待一段时间确保页面完全加载
+      logger.info(`   ⏳ 页面已跳转，等待完全加载（10秒）...`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      // 11. 获取 4 个 token
+      logger.info(`   ⏳ 获取 token...`);
+
+      try {
+        const tokens = await getLoginTokens(page);
+        // 使用获取到的 tokens 进行后续操作
+        logger.info('获取到的 tokens:', tokens);
+        return tokens;
+      } catch (error) {
+        logger.error('获取 tokens 失败:', error.message);
+        // 处理错误情况
+      }
+    }
+  } catch (error) {
+    logger.error(`登录子号失败: ${error.message}`);
+    throw error;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
+/**
+ * 获取登录后的 tokens
+ * @param {Object} page - Puppeteer 页面对象
+ * @returns {Promise<Object>} 包含 tokens 的对象
+ */
+async function getLoginTokens(page) {
+  logger.info(`   ⏳ 获取 token...`);
+
+  // 获取所有 cookies
+  const cookies = await page.cookies();
+
+  // 从 cookies 中提取需要的值
+  const secure_c_ses = cookies.find(c => c.name === '__Secure-C_SES')?.value || null;
+  const host_c_oses = cookies.find(c => c.name === '__Host-C_OSES')?.value || '';
+
+  // 从 URL 中提取 csesidx 和 team_id (config_id)
+  const currentUrl = page.url();
+  const urlParams = new URLSearchParams(new URL(currentUrl).search);
+  const csesidx = urlParams.get('csesidx') || null;
+
+  // 从 URL 路径中提取 team_id (在 /cid/ 后面)
+  const pathMatch = currentUrl.match(/\/cid\/([^/?]+)/);
+  const team_id = pathMatch ? pathMatch[1] : null;
+
+  // 验证是否获取到所有必需的 token
+  if (!secure_c_ses || !csesidx || !team_id) {
+    logger.info(`   ⚠️  Token 获取不完整:`);
+    logger.info(`      secure_c_ses: ${secure_c_ses ? '✓' : '✗'}`);
+    logger.info(`      csesidx: ${csesidx ? '✓' : '✗'}`);
+    logger.info(`      team_id: ${team_id ? '✓' : '✗'}`);
+    logger.info(`      host_c_oses: ${host_c_oses ? '✓' : '✗'}`);
+    logger.info(`      当前 URL: ${currentUrl}`);
+    throw new Error('Token 获取不完整，请检查登录流程');
+  }
+
+  const tokens = {
+    csesidx: csesidx,
+    host_c_oses: host_c_oses,
+    secure_c_ses: secure_c_ses,
+    team_id: team_id,
+  };
+
+  logger.info(`   ✓ 登录成功，获取到 4 个 token`);
+  logger.info(`      csesidx: ${csesidx.substring(0, 20)}...`);
+  logger.info(`      team_id: ${team_id}`);
+  logger.info(`      secure_c_ses: ${secure_c_ses.substring(0, 20)}...`);
+  logger.info(`      host_c_oses: ${host_c_oses ? host_c_oses.substring(0, 20) + '...' : '(空)'}`);
+
+  return tokens;
+}
+
+/**
+ * 自动刷新所有Gemini账户的令牌
+ */
+async function autoRefreshGeminiTokens(loginEmail, token) {
+  try {
+    // 加载Gemini配置
+    const geminiConfig = loadGeminiMailConfig();
+    const children = geminiConfig.accounts.children || [];
+
+    if (children.length === 0) {
+      throw new Error('gemini-mail.yaml 中没有子账户，请先选择账户');
+    }
+
+    logger.info(`准备刷新 ${children.length} 个账户的令牌...`);
+
+    // 验证母号是否匹配
+    const parent = geminiConfig.accounts.parent;
+    if (!parent || parent.email !== loginEmail) {
+      logger.warn(`母号不匹配！配置文件中的母号: ${parent?.email}, 当前登录的母号: ${loginEmail}`);
+      throw new Error('母号不匹配，请检查配置');
+    }
+
+    // 刷新每个子账户的令牌
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const child of children) {
+      try {
+        logger.info(`正在刷新账户: ${child.email}`);
+
+        // 登录并获取新令牌
+        const tokens = await loginGeminiChild(child, token);
+
+        // 更新配置中的令牌
+        child.tokens = {
+          csesidx: tokens.csesidx || '',
+          host_c_oses: tokens.host_c_oses || '',
+          secure_c_ses: tokens.secure_c_ses || '',
+          team_id: tokens.team_id || ''
+        };
+        child.lastUpdated = new Date().toISOString();
+
+        successCount++;
+        logger.info(`账户 ${child.email} 令牌刷新成功`);
+
+        // 添加延迟，避免请求过快
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        failureCount++;
+        logger.error(`账户 ${child.email} 令牌刷新失败: ${error.message}`);
+      }
+    }
+
+    // 保存更新后的配置
+    saveGeminiMailConfig(geminiConfig);
+
+    logger.info(`令牌刷新完成: 成功 ${successCount} 个，失败 ${failureCount} 个`);
+    return { successCount, failureCount };
+  } catch (error) {
+    logger.error(`自动刷新令牌失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 更新Gemini Pool的账户（删除所有并重新添加）
+ */
+async function updateGeminiPool() {
+  try {
+    // 1. 读取 gemini-mail.yaml
+    logger.info('读取账户信息...');
+    const geminiConfig = loadGeminiMailConfig();
+    const poolApiUrl = geminiConfig.poolApiUrl;
+    const password = geminiConfig.password;
+    const accounts = geminiConfig.accounts;
+
+    if (!accounts.children || accounts.children.length === 0) {
+      logger.error('gemini-mail.yaml 中没有子账户，请先选择账户');
+      return;
+    }
+    logger.info('登录获取 token...',poolApiUrl, password);
+    // 2. 登录获取 token
+    const adminToken = await loginGeminiPool(poolApiUrl, password);
+  
+    // 3. 删除所有账户
+    await deleteAllAccounts(poolApiUrl, adminToken);
+
+    // 4. 添加所有账户
+    await addAllAccounts(poolApiUrl, accounts, adminToken);
+
+    logger.info('\n✓ 所有任务完成！');
+    
+    // 获取最终账户总数并返回结果
+    const finalAccounts = await getPoolAccounts(poolApiUrl, adminToken);
+    return { totalCount: finalAccounts.length };
+  } catch (error) {
+    logger.error(`更新Gemini Pool失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 删除所有账户
+ */
+async function deleteAllAccounts(poolApiUrl, adminToken) {
+  try {
+    // 获取所有账户
+    const accounts = await getPoolAccounts(poolApiUrl, adminToken);
+
+    if (accounts.length === 0) {
+      logger.info('平台上没有账户需要删除');
+      return 0;
+    }
+
+    logger.info(`\n开始删除所有账户（共 ${accounts.length} 个）...`);
+
+    let deletedCount = 0;
+
+    for (const account of accounts) {
+      const accountId = account.id;
+      logger.info(`正在删除账户 ID ${accountId}...`);
+
+      const deleted = await deleteAccount(poolApiUrl, accountId, adminToken);
+      if (deleted) {
+        logger.info(`账户 ${accountId} 已删除`);
+        deletedCount++;
+      } else {
+        logger.warn(`账户 ${accountId} 删除失败`);
+      }
+
+      // 添加小延迟避免请求过快
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    logger.info(`\n=== 删除完成 ===`);
+    logger.info(`已删除: ${deletedCount}/${accounts.length} 个账户`);
+
+    return deletedCount;
+
+  } catch (error) {
+    logger.error('删除账户失败:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 添加所有账户
+ */
+async function addAllAccounts(poolApiUrl, yamlAccounts, adminToken) {
+  try {
+    logger.info('\n=== 开始添加账户 ===');
+
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    // 遍历 YAML 中的子账户
+    if (yamlAccounts.children && yamlAccounts.children.length > 0) {
+      for (const child of yamlAccounts.children) {
+        if (!child.tokens) {
+          logger.info(`\n跳过账户 ${child.email}: 没有 tokens 信息`);
+          skippedCount++;
+          continue;
+        }
+
+        const accountData = {
+          team_id: child.tokens.team_id,
+          secure_c_ses: child.tokens.secure_c_ses,
+          host_c_oses: child.tokens.host_c_oses,
+          csesidx: child.tokens.csesidx,
+          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+        };
+
+        logger.info(`\n正在添加账户 ${child.email}...`);
+        const success = await addAccount(poolApiUrl, accountData, adminToken);
+
+        if (success) {
+          logger.info(`账户 ${child.email} 添加成功`);
+          addedCount++;
+        } else {
+          logger.warn(`账户 ${child.email} 添加失败`);
+        }
+
+        // 添加小延迟
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+
+    // 获取最终账户总数
+    const finalAccounts = await getPoolAccounts(poolApiUrl, adminToken);
+
+    logger.info('\n=== 添加完成 ===');
+    logger.info(`成功添加: ${addedCount}`);
+    logger.info(`跳过: ${skippedCount}`);
+    logger.info(`当前总数: ${finalAccounts.length}`);
+
+    return { addedCount, skippedCount, totalCount: finalAccounts.length };
+
+  } catch (error) {
+    logger.error('添加账户失败:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 清理无效账户
+ */
+async function cleanInvalidAccounts() {
+  try {
+    const config = loadGeminiMailConfig();
+    const poolUrl = config.poolApiUrl;
+    const password = config.password;
+
+    if (!password) {
+      throw new Error('gemini-mail.yaml 中未配置密码');
+    }
+
+    logger.info('正在登录 Gemini Pool 平台...');
+    const adminToken = await loginGeminiPool(poolUrl, password);
+    logger.info('登录成功！');
+
+    logger.info('正在获取平台账户列表...');
+    const accounts = await getPoolAccounts(poolUrl, adminToken);
+    logger.info(`找到 ${accounts.length} 个平台账户`);
+
+    if (accounts.length === 0) {
+      logger.info('平台上没有账户');
+      return { validCount: 0, invalidCount: 0 };
+    }
+
+    logger.info('开始检测账户有效性...');
+    let validCount = 0;
+    let invalidCount = 0;
+
+    for (const account of accounts) {
+      const accountId = account.id;
+      logger.info(`检测账户 ID ${accountId}...`);
+
+      const isValid = await testAccount(poolUrl, accountId, adminToken);
+
+      if (isValid) {
+        logger.info(`账户 ${accountId} 可用`);
+        validCount++;
+      } else {
+        logger.info(`账户 ${accountId} 不可用，正在删除...`);
+        const deleted = await deleteAccount(poolUrl, accountId, adminToken);
+        if (deleted) {
+          logger.info(`账户 ${accountId} 已删除`);
+          invalidCount++;
+        } else {
+          logger.warn(`账户 ${accountId} 删除失败`);
+        }
+      }
+
+      // 添加小延迟避免请求过快
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    logger.info(`清理完成: 存活账户 ${validCount}/${accounts.length}，已删除 ${invalidCount} 个无效账户`);
+    return { validCount, invalidCount };
+  } catch (error) {
+    logger.error(`清理无效账户失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 选择Business账户
+ */
+async function selectBusinessAccounts(accountIds) {
+  try {
+    // 加载temp-mail.yaml中的所有子号
+    const tempMailConfig = require('../utils/config').loadTempMailConfig();
+    const children = tempMailConfig.accounts.children || [];
+
+    if (children.length === 0) {
+      throw new Error('没有找到任何子号，请先在邮箱管理中创建子号');
+    }
+
+    // 读取 gemini-mail.yaml 的配置
+    const geminiConfig = loadGeminiMailConfig();
+    const poolApiUrl = geminiConfig.poolApiUrl;
+    const password = geminiConfig.password || '';
+
+    // 根据ID选择子账户
+    const selectedChildren = [];
+    for (const id of accountIds) {
+      const index = parseInt(id, 10) - 1;
+      if (index >= 0 && index < children.length) {
+        selectedChildren.push(children[index]);
+      }
+    }
+
+    if (selectedChildren.length === 0) {
+      throw new Error('没有选择任何有效的账号');
+    }
+
+    // 保存到 gemini-mail.yaml（清空原有列表）
+    const newGeminiConfig = {
+      ...geminiConfig,
+      accounts: {
+        parent: tempMailConfig.accounts.parent,
+        children: selectedChildren
+      }
+    };
+
+    saveGeminiMailConfig(newGeminiConfig);
+
+    logger.info(`已选择 ${selectedChildren.length} 个账号并保存到 gemini-mail.yaml`);
+    return selectedChildren;
+  } catch (error) {
+    logger.error(`选择Business账户失败: ${error.message}`);
+    throw error;
+  }
+}
+
+module.exports = {
+  loginGeminiPool,
+  getPoolAccounts,
+  testAccount,
+  deleteAccount,
+  addAccount,
+  autoRefreshGeminiTokens,
+  updateGeminiPool,
+  cleanInvalidAccounts,
+  selectBusinessAccounts
+};

@@ -1,0 +1,83 @@
+poolApiUrl: http://127.0.0.1:8000
+password: '1'
+accounts:
+  parent:
+    accountId: 1
+    email: admin@artpayaws.site
+    name: admin
+    status: 0
+    latestEmailTime: null
+    createTime: '2025-12-04 11:14:14'
+    userId: 1
+    isDel: 0
+  children:
+    - accountId: 17
+      email: oIZZFlnY1xLl8ql@artpayaws.site
+      name: oIZZFlnY1xLl8ql
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-06 09:52:03'
+      userId: 1
+      isDel: 0
+      tokens:
+        csesidx: '1533976106'
+        host_c_oses: COS.AfQtEyC_K72OZr7rzcODUQCd_Q8N_bk48ROpXRgN0-l7jz3WyHTVPeWrwHvZqs3pa2eWb8NYzx2aqC7oAiH7jf-ciBxpG7v41DdGUCY6ywJvQTB0__xbIYrCC6wGJRGSPKWXTqTQv_laqK5p
+        secure_c_ses: CSE.AdwtfTA5tPAeZtpOQYYCLT97eZfHXf-HGMzI4kzOLf2a15Z74GfI-FCFkeiL40iyuX5rz3_egykgF2w2dLJfjvjtBlRP9YzsQGuKzCr0Hz4hwbRad4kSa88UWrcfA59NNkaEU3f781jlXQIK0SfcJugj_un0GeyqBDcAbGY21R4wQUq-GaiGRHoWKsGDsodr7uBNUpkm0ngYLtZ9t8RRCtSkH4xUyOjVjaClASWfWUs2r-TP649TaIVFiWLYDN57AkZx6uEHTDXBoo4qZJkmw7kIbROeobfe6LgAv84n1DfujF7Isla72uhWy3aFLDOn_zirMewO_BJSjQJnyC0ZFqnzLWZFvDZRhC326YZrUMy3XDGYYXF5M7qTX7NQO8KzK-Z8WaeYDigzbjca2MF2tpZh97GIb1nPNkRVg1EFKR_bNXbvFiBLNULWjLIHLj9a6QUbQdfMAuN5tA
+        team_id: 5a85c5e3-e3e1-4b0b-95a8-a5a182f94822
+      lastUpdated: '2025-12-12T11:14:25.899Z'
+    - accountId: 18
+      email: vVwJqAOg6IFCI1c@artpayaws.site
+      name: vVwJqAOg6IFCI1c
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-06 10:33:29'
+      userId: 1
+      isDel: 0
+      tokens:
+        csesidx: '257952880'
+        host_c_oses: COS.AfQtEyBVJ7YvAQ8egOFU91BU7tvdwnU-8HDHzhgpT3EsORk7FimmrIUU-mUDynsuIRqY3GFPVp2n_DuF0lJsZQM1N94x80SkOKW8IgsboIZmDJGwzl77BWdqYEkDFl4YVhK188hLUR6qDCw0
+        secure_c_ses: CSE.AdwtfTCKlaZuTJUdbU3S08oMhn5SvnEtLPAJxiqUnUwiE9DlhQj-khA6EjCC2M6nB93ZZkpEOqPp84fpDSxvoood2Nw8u_y6d9CUTV32LtxIrw4YZV51vq149ZCNP9QF4IMTCbkBzFGVHSI9WBhWIZ-_oie9ZblQtSDDc5NWsz4zRjg76UH6ie8UnVNImsmDec7M6rtlcavs29WsoeW9qfo9QYlR3GQKH-06Z7soPrs3z6sslqa1OAjgTaqXyolVj6UoyACv455UokaEiz_RXL0gmCYGDSb7pTuY6by2VEMc2CeBOnoZNrXbRBvSVz_CUzd3MfXU0udFfSATYpHB791LarOK2HIhD9xWLbjw6DwBI7rz8NJ3pR7cCwMlA8teh6Pum2PPyNRkcT1CTPJiSAvOyf9KEPpO0v8rvKA7z6ZfbKxMzRL9kn8JZJT9U8hDqvyD9dwgl-Kv
+        team_id: 6be2f22f-8a65-4741-9e37-a5f4fbfd6172
+      lastUpdated: '2025-12-12T11:15:24.116Z'
+    - accountId: 19
+      email: bhmUuyiVr4QIsuz@artpayaws.site
+      name: bhmUuyiVr4QIsuz
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-06 11:08:40'
+      userId: 1
+      isDel: 0
+      tokens:
+        csesidx: '470939495'
+        host_c_oses: COS.AfQtEyBHdnHeerkF5V9Z33337ckGET60DZFytXf0VBHllwXFGACsi6YhnyaKFVYGq6cJSCovM89Mx2K0E_Z8jrhtNg0tpEWqVf4JI4lTqPfs5j0uZ8ZxGL1z22vl7k3nGlGmdPMsKsPq4OnN
+        secure_c_ses: CSE.AdwtfTALnSpcECmV12BN6PlW0EheWyxElDK_rX30mUR4R1rnysUykTwTzMveaqsoeJxwsusDJRD6DiXX6-ik7vZILoQTrafjnIr8t-QuCp4ydxnBJ4EQ0s6i5Xep1MPrqInbAUpf_Ep8QGSRN3g4SwFai8s7ax4xNiiZpgcpHd0bRukclzvUsKZcEXBKFMHy_c2Is16vEowz282fIRS0rBJMUHETWDAmv6kB05thZUjKN_RzWGnt_lFzUnvtWvWBfEHgvjbm3RvJg9nkMDKsGP_Ojjft7ir5SMXA8GxI3H0g-4Tn24F4rAOI2VsQy3VK9jX1_uckUAEK1fCpNKV4VMKBhSuz0N3mP3oGiJhdinCnZhOQuJFEEWm1g917R7CDErZ2km0AMEcz9f7g1cK7oeCMLYYygus7WDCwMOrOgcOxj1tbCVaf_x2Jf_4G-HM3-2S39Uyg6n7vfQ
+        team_id: 4df6331d-abf1-4eb8-aaa4-9d15fe16c18b
+      lastUpdated: '2025-12-12T11:16:21.855Z'
+    - accountId: 20
+      email: Ajvz2GiB6chgPQj@artpayaws.site
+      name: Ajvz2GiB6chgPQj
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-06 11:08:48'
+      userId: 1
+      isDel: 0
+      tokens:
+        csesidx: '814360165'
+        host_c_oses: COS.AfQtEyBoqpEafC7pphinRCovV8h8SpJh-5Vu-FsKQz6NIHt69j5xYyhoOb9JCuLKHxTC407qyZgzY3SZt5XdjYtkQ3b9n9t2VuKlnDmBYhTOIHimy1TyVGTYJ0_kwjUcOGLQQ3w3o8q6xsXR
+        secure_c_ses: CSE.AdwtfTDXxPHr5IT6klL-Sgl8Rf7BAkit8WjJRCUXGv6e1LV59-S3qrVIoV4neUZ9UmOsFBTzcj81a6gjwWa5-P75DHK8aFzVu5KLvLGfW78zetK_nqdsIJ16XCgKRv0fuh4Tu5o09Ukyk2YvogixfPPaZSBhHZazD8e6Ok3x8Fwm5obClTSbRY2MuXMpvny_fXV_rfkW1kD9wrdx-HzJrxms39lNCXAiHnq_C630SAgkbk2ip59S-Qa0q1brfb-tPtcz7xGHX74zwTqKAFHexwdir4HeV7PGGc4-JT7ksKH_JH5kuRI56aNNWADIpMDqi616oUl9jrLJH4DlX56ef5egh4cCWeqa040jCkoU6mtAsN29iugS59Qhh73Awtv_ZX80qODQ3ySzOIsVq2_A0Sk9K-nM1SUOLfFrQu0i9r8e9Y5hA3-LNFCgcVrVhiU0gkxHrJWrp2Qz9A
+        team_id: e4d9bb3c-7d0b-43df-a0f9-5e774ade39ae
+      lastUpdated: '2025-12-12T11:17:04.954Z'
+    - accountId: 21
+      email: tpaqV3Ih4uO9OXt@artpayaws.site
+      name: tpaqV3Ih4uO9OXt
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-06 11:08:52'
+      userId: 1
+      isDel: 0
+      tokens:
+        csesidx: '2015019896'
+        host_c_oses: COS.AfQtEyDckrMo6qxvizNrSYM8pUV8GGLYwO4Ku5hX8H-fzqALzbU6lPoMPxVBcNQQAOEg3p52Jym6ILviCEuPlXhFBUZATA1Pa597ezzWEAzgcIlbkcf27ZEjLpbrgOSuluCHjzAZncxLQccw
+        secure_c_ses: CSE.AdwtfTBwMC6hGtasyDK8yV-KuSXv1SDPlJJuTGcF_qTeQ--hEGSc5qi7TiaqAnFnASaDd00mr2VI97983zbC3qQFrAWZD4Ps5G5592HHjXv2XqeUgY2ffGB7vkggO1DvFiXwewRKZt65W2I4pCAwvUU8jQqrIdcvKdNp2wtUZMkr5yM0uU1Bed3lf1r8-MrOGtNPB2kwpU1SO3ztWTo7KeD1XZIDmNHuyiW34nhk5uq2Z-AMMPYW6KeTitRmJYLp49yiIgf8fZRYHebu6Z0UaTK4ILcATPrwGFgau3wQ1oDGjkbMSPN2HcZUzP93TasoDb8pWPXdYGKAqrvqvlQCPAVf3JuL9nN4ySjeOCOyej3HBxGIA4trrAbddW_sxbH8fb9EwU9KbSDSWYLtV0kKCY-pOX6ofF1yY38Xxx52Dz4I6IeaVU5f3t0R6irBn_GLckd2gMEOwHurDw
+        team_id: 95c7ed71-7aaf-4860-b8ee-e4464dee5676
+      lastUpdated: '2025-12-12T11:17:58.359Z'

@@ -1,0 +1,27 @@
+{
+  "name": "gemini-api-service",
+  "version": "1.0.0",
+  "description": "Gemini Business API Service - RESTful API for managing email accounts and Gemini tokens",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": ["gemini", "api", "email", "tokens"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.7",
+    "js-yaml": "^4.1.0",
+    "puppeteer": "^21.7.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "joi": "^17.12.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
