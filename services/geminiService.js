@@ -568,7 +568,7 @@ async function loginGeminiChild(childAccount, token) {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
     // 对于HTTP代理，需要单独设置认证信息
-    if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password) {
+    if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password && proxyValid) {
       await page.authenticate({
         username: proxyConfig.username,
         password: proxyConfig.password
