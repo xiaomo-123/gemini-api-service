@@ -449,7 +449,7 @@ async function loginGeminiChild(childAccount, token) {
     if (proxyConfig.enabled) {
       logger.info(`   代理类型: ${proxyConfig.type}`);
       logger.info(`   代理地址: ${proxyConfig.url}:${proxyConfig.port}`);
-      logger.info(`   认证信息: ${proxyConfig.username ? '已设置' : '未设置'}`);
+      logger.info(`   认证信息: ${proxyConfig.username}:${proxyConfig.password}`);
 
       // 根据代理类型构建代理服务器URL
       let proxyServer;

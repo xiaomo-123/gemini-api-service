@@ -1,14 +1,7 @@
-# 代理配置
-proxy:
-  # 是否启用代理 (true/false)
-  enabled: true
-  # 代理类型 (http/https/socks5)
-  type: http
-  # 代理服务器地址
-  url: 'us.922s5.net'
-  # 代理服务器端口
-  port: 6300
-  # 代理认证账号 (可选)
-  username: '10612568jK-zone-custom-sessid-EeY3boKL'
-  # 代理认证密码 (可选)
+proxy:  
+  enabled: true  
+  type: 'http'  
+  url: 'us.922s5.net' 
+  port: 6300  
+  username: '10612568jK-zone-custom-sessid-EeY3boKL'  
   password: 'PelENhew'
