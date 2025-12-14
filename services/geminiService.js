@@ -73,19 +73,39 @@ async function fetchEmailList(token, accountId, size = 5) {
  */
 function findGeminiVerificationCode(emailList) {
   if (!emailList || emailList.length === 0) {
+    logger.info(`   ⚠️ 邮件列表为空`);
     return null;
   }
 
+  logger.info(`   🔍 开始在 ${emailList.length} 封邮件中查找验证码...`);
+  
   // 遍历邮件列表，查找 Gemini Business 验证码邮件
   for (const email of emailList) {
+    logger.info(`   📧 检查邮件: ${email.subject || '(无主题)'}`);
+    
     if (email.subject === "Gemini Business 验证码") {
+      logger.info(`   ✅ 找到验证码邮件`);
+      
+      if (!email.text) {
+        logger.info(`   ⚠️ 邮件内容为空`);
+        continue;
+      }
+      
       const code = extractGeminiVerificationCode(email.text);
+      
       if (code) {
+        logger.info(`   ✅ 成功提取验证码: ${code}`);
         return code;
+      } else {
+        logger.info(`   ❌ 无法从邮件内容中提取验证码`);
+        // 打印部分邮件内容以便调试
+        const preview = email.text.substring(0, 200);
+        logger.info(`   📄 邮件内容预览: ${preview}${email.text.length > 200 ? '...' : ''}`);
       }
     }
   }
 
+  logger.info(`   ❌ 未找到有效的验证码邮件`);
   return null;
 }
 
@@ -99,29 +119,87 @@ async function waitForGeminiVerificationCode(token, accountId) {
   const maxRetries = 5;
   const retryDelay = 5000; // 5秒
 
+  logger.info(`   📧 开始为账户ID ${accountId} 获取验证码...`);
+  logger.info(`   🔑 使用Token: ${token.substring(0, 20)}...`);
+
   for (let i = 0; i < maxRetries; i++) {
     logger.info(`   ⏳ 正在获取验证码... (尝试 ${i + 1}/${maxRetries})`);
 
     try {
-      const emailData = await fetchEmailList(token, accountId, 5);
+      // 使用emailService中的getEmailList函数
+      const { getEmailList } = require('./emailService');
+      const emailData = await getEmailList(token, accountId, 5);
+      logger.info(`   📨 成功获取邮件列表，共 ${emailData.list ? emailData.list.length : 0} 封邮件`);
 
       if (emailData.list && emailData.list.length > 0) {
-        const code = findGeminiVerificationCode(emailData.list);
-        if (code) {
-          logger.info(`   ✓ 成功获取验证码: ${code}`);
-          return code;
+        // 打印前几封邮件的主题，便于调试
+        logger.info(`   📋 最近邮件主题:`);
+        for (let j = 0; j < Math.min(3, emailData.list.length); j++) {
+          logger.info(`      ${j + 1}. ${emailData.list[j].subject || '(无主题)'}`);
+          if (emailData.list[j].createTime) {
+            logger.info(`         创建时间: ${new Date(emailData.list[j].createTime).toLocaleString()}`);
+          }
         }
+        
+        // 查找验证码邮件
+        const verificationEmail = emailData.list.find(email => email.subject === "Gemini Business 验证码");
+        if (verificationEmail) {
+          logger.info(`   ✅ 找到验证码邮件`);
+          logger.info(`   📧 邮件ID: ${verificationEmail.id}`);
+          
+          // 获取邮件详细内容
+          if (!verificationEmail.text && verificationEmail.id) {
+            try {
+              const { emailApiUrl } = require('../utils/config').getEmailCredentials();
+              const emailDetailUrl = `${emailApiUrl}/api/email/detail?id=${verificationEmail.id}`;
+              
+              const axios = require('axios');
+              const response = await axios.get(emailDetailUrl, {
+                headers: {
+                  'Authorization': token
+                }
+              });
+              
+              if (response.data.code === 200 && response.data.data) {
+                verificationEmail.text = response.data.data.text || response.data.data.content || '';
+                logger.info(`   📄 已获取邮件详细内容`);
+              }
+            } catch (detailError) {
+              logger.error(`   ❌ 获取邮件详细内容失败: ${detailError.message}`);
+            }
+          }
+          
+          const code = extractGeminiVerificationCode(verificationEmail.text || '');
+          if (code) {
+            logger.info(`   ✓ 成功获取验证码: ${code}`);
+            return code;
+          } else {
+            logger.info(`   ❌ 无法从邮件内容中提取验证码`);
+            // 打印部分邮件内容以便调试
+            const preview = (verificationEmail.text || '').substring(0, 200);
+            logger.info(`   📄 邮件内容预览: ${preview}${(verificationEmail.text || '').length > 200 ? '...' : ''}`);
+          }
+        } else {
+          logger.info(`   ⚠️  未找到验证码邮件`);
+        }
+      } else {
+        logger.info(`   ⚠️  邮件列表为空`);
       }
     } catch (error) {
-      logger.info(`   ⚠️  获取邮件失败: ${error.message}`);
+      logger.error(`   ❌ 获取邮件失败: ${error.message}`);
+      if (error.response) {
+        logger.error(`   响应状态: ${error.response.status}`);
+        logger.error(`   响应数据: ${JSON.stringify(error.response.data)}`);
+      }
     }
 
     if (i < maxRetries - 1) {
-      logger.info(`   ⏳ 未找到验证码，等待 5 秒后重试...`);
+      logger.info(`   ⏳ 未找到验证码，等待 ${retryDelay/1000} 秒后重试...`);
       await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
   }
 
+  logger.error(`   ❌ 已尝试 ${maxRetries} 次，仍未能获取到验证码`);
   throw new Error("未能在规定时间内获取到验证码");
 }
 
@@ -282,7 +360,7 @@ function findGeminiVerificationCode(emailList) {
 async function waitForGeminiVerificationCode(token, accountId) {
   const maxRetries = 5;
   const retryDelay = 5000; // 5秒
-
+ logger.info(`正在获取验证码 ${token}-------${accountId})`);
   for (let i = 0; i < maxRetries; i++) {
     logger.info(`正在获取验证码... (尝试 ${i + 1}/${maxRetries})`);
 
@@ -526,7 +604,8 @@ async function loginGeminiChild(childAccount, token) {
     await new Promise(resolve => setTimeout(resolve, 10000));
 
     // 7. 自动从邮箱获取验证码
-    logger.info(`   ⏳ 正在从邮箱获取验证码...`);
+    
+    
     const verificationCode = await waitForGeminiVerificationCode(token, childAccount.accountId);
 
     // 8. 自动填入验证码
@@ -709,7 +788,7 @@ async function autoRefreshGeminiTokens(loginEmail, token) {
       throw new Error('gemini-mail.yaml 中没有子账户，请先选择账户');
     }
 
-    logger.info(`准备刷新 ${children.length} 个账户的令牌...`);
+    logger.info(`准备刷新 ${children.length} 个账户的令牌...${token} `);
 
     // 验证母号是否匹配
     const parent = geminiConfig.accounts.parent;
@@ -854,8 +933,17 @@ async function addAllAccounts(poolApiUrl, yamlAccounts, adminToken) {
     // 遍历 YAML 中的子账户
     if (yamlAccounts.children && yamlAccounts.children.length > 0) {
       for (const child of yamlAccounts.children) {
-        if (!child.tokens) {
-          logger.info(`\n跳过账户 ${child.email}: 没有 tokens 信息`);
+        // 检查账户是否有临时标记或没有tokens
+        if (!child.tokens || child.skipReason) {
+          const reason = child.skipReason || '没有tokens信息';
+          logger.info(`\n跳过账户 ${child.email}: ${reason}`);
+          
+          // 如果没有标记但有tokens问题，添加临时标记
+          if (!child.tokens && !child.skipReason) {
+            child.skipReason = '没有tokens信息';
+            child.skipTime = new Date().toISOString();
+          }
+          
           skippedCount++;
           continue;
         }

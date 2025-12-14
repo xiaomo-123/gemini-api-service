@@ -19,3 +19,9 @@ accounts:
       createTime: '2025-12-14 01:14:44'
       userId: 1
       isDel: 0
+      tokens:
+        csesidx: '419424590'
+        host_c_oses: COS.AfQtEyAXBI84bUZ3N6bxmPNoXhS59V9Eqxz35oHTnprwXhjci2dTvvc282GXFYNqBra4NraYygVPFGwdiCOJrrA4w4Rbvwx5m0_AGBS3PXVoEeRn3KenoGmd441bUiMEzYGOHewx5sDm0zVz
+        secure_c_ses: CSE.AdwtfTB6KidIqCTiZeVhWGugYoqxy3F1z4gqYwKGyWcD3LLKpkHk1vq5umHFGXYmF7-gqUbyOr8rN26evOjxVtlFJ62eYsHfItW302y55JYpK20fGqVwZ-JuqwpkgNai83GCrGxYtNdk5TJZlc-VICuxObszhGRmuHm187M1JyoBMEneJoQeBUU-LLeERQ7tOCJQHDJO8zoilBTgqwmwvY6SgvsFFkFKGFYVIpwxN12D7lWEYyFnKZsO_KzWCjfnQb7oZNgMJ59-yes2gx18m_9qDsqImcLhZFSFSkgSQSQ38M3lvQfme9QACHjzu-gcrs271hZ1h1j53-H580alNMSIat6G45Nw3-EWEsPibc5eDZ62N0RwyCBDKBDt0pYI8b-fpe4WGmfiEDmq_9DD6jpGUC1EZsM8mza6D7rtszRlQMLfM2p_LBtERz5EOh0oGcBEsxyJOQKilg
+        team_id: 11868ad2-beb6-410b-9d8a-9d538e07e025
+      lastUpdated: '2025-12-14T02:42:46.431Z'
