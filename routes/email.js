@@ -88,6 +88,81 @@ router.post('/accounts', getEmailToken, async (req, res, next) => {
 });
 
 /**
+ * POST /api/email/accounts/batch
+ * 批量创建多个邮箱账户
+ */
+router.post('/accounts/batch', getEmailToken, async (req, res, next) => {
+  // 验证请求参数
+  const countSchema = Joi.object({
+    count: Joi.number().integer().min(1).max(50).required().messages({
+      'number.base': '数量必须是数字',
+      'number.integer': '数量必须是整数',
+      'number.min': '数量至少为1',
+      'number.max': '数量不能超过50',
+      'any.required': '数量是必填项'
+    })
+  });
+  
+  try {
+    // 验证参数
+    const { error, value } = countSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: '参数验证失败',
+        error: error.details[0].message
+      });
+    }
+    
+    const { count } = value;
+    logger.info(`开始批量创建 ${count} 个邮箱账户`);
+    
+    const accounts = [];
+    const errors = [];
+    
+    // 并发创建账户，但限制并发数
+    const concurrencyLimit = 5;
+    for (let i = 0; i < count; i += concurrencyLimit) {
+      const batch = [];
+      const batchEnd = Math.min(i + concurrencyLimit, count);
+      
+      for (let j = i; j < batchEnd; j++) {
+        batch.push(
+          createEmailAccount(req.emailToken)
+            .then(account => ({ success: true, account, index: j }))
+            .catch(error => ({ success: false, error: error.message, index: j }))
+        );
+      }
+      
+      const results = await Promise.all(batch);
+      
+      results.forEach(result => {
+        if (result.success) {
+          accounts.push(result.account);
+        } else {
+          errors.push({ index: result.index, error: result.error });
+        }
+      });
+    }
+    
+    res.status(201).json({
+      success: true,
+      message: `批量创建完成，成功: ${accounts.length}，失败: ${errors.length}`,
+      data: {
+        created: accounts,
+        failed: errors,
+        totalRequested: count,
+        totalCreated: accounts.length,
+        totalFailed: errors.length
+      }
+    });
+  } catch (error) {
+    logger.error(`批量创建邮箱账户失败: ${error.message}`);
+    next(error);
+  }
+});
+
+/**
  * DELETE /api/email/accounts/all
  * 删除所有邮箱账户
  */
