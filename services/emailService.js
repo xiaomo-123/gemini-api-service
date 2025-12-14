@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { getEmailCredentials, loadTempMailConfig, saveTempMailConfig } = require('../utils/config');
+const { getEmailCredentials, loadTempMailConfig, saveTempMailConfig, loadGeminiMailConfig, saveGeminiMailConfig } = require('../utils/config');
 const logger = require('../utils/logger');
 
 /**
@@ -263,6 +263,68 @@ function splitAccounts(list, loginEmail) {
   return { parent, children };
 }
 
+/**
+ * 删除所有邮箱账户
+ */
+async function deleteAllEmailAccounts(token) {
+  try {
+    // 加载配置
+    const tempMailConfig = loadTempMailConfig();
+    const geminiMailConfig = loadGeminiMailConfig();
+    
+    // 获取所有子账号
+    const tempChildren = tempMailConfig.accounts.children || [];
+    const geminiChildren = geminiMailConfig.accounts.children || [];
+    
+    // 记录删除结果
+    const results = {
+      tempMailDeleted: [],
+      geminiMailDeleted: [],
+      errors: []
+    };
+    
+    // 删除temp-mail中的所有子账号
+    for (const child of tempChildren) {
+      try {
+        await deleteEmailAccount(token, parseInt(child.accountId));
+        results.tempMailDeleted.push({
+          accountId: child.accountId,
+          email: child.email
+        });
+      } catch (error) {
+        results.errors.push({
+          accountId: child.accountId,
+          email: child.email,
+          error: error.message
+        });
+      }
+    }
+    
+    // 清空temp-mail中的children
+    tempMailConfig.accounts.children = [];
+    saveTempMailConfig(tempMailConfig);
+    
+    // 清空gemini-mail中的children
+    geminiMailConfig.accounts.children = [];
+    saveGeminiMailConfig(geminiMailConfig);
+    
+    // 记录删除的gemini账号
+    for (const child of geminiChildren) {
+      results.geminiMailDeleted.push({
+        accountId: child.accountId,
+        email: child.email
+      });
+    }
+    
+    logger.info(`已删除 ${results.tempMailDeleted.length} 个temp-mail子账号和 ${results.geminiMailDeleted.length} 个gemini-mail子账号`);
+    
+    return results;
+  } catch (error) {
+    logger.error(`删除所有邮箱账户失败: ${error.message}`);
+    throw error;
+  }
+}
+
 module.exports = {
   loginEmailService,
   getAllEmailAccounts,
@@ -270,5 +332,6 @@ module.exports = {
   deleteEmailAccount,
   getEmailList,
   getLatestVerificationCode,
+  deleteAllEmailAccounts,
   splitAccounts
 };

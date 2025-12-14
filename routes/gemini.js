@@ -1,7 +1,8 @@
 const express = require('express');
 const Joi = require('joi');
 const { 
-  loginEmailService 
+  loginEmailService,
+  getAllEmailAccounts 
 } = require('../services/emailService');
 const { 
   autoRefreshGeminiTokens,
@@ -9,7 +10,7 @@ const {
   cleanInvalidAccounts,
   selectBusinessAccounts
 } = require('../services/geminiService');
-const { loadGeminiMailConfig, loadTempMailConfig } = require('../utils/config');
+const { loadGeminiMailConfig, loadTempMailConfig, saveGeminiMailConfig } = require('../utils/config');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -158,9 +159,25 @@ router.get('/refresh-tokens', async (req, res, next) => {
     
     // 步骤2: 获取子号列表
     logger.info('\n📋 步骤 2: 获取子号列表');
+    //temp-mail.yaml
     const { loginEmail } = require('../utils/config').getEmailCredentials();
+    
+    // 通过getAllEmailAccounts获取所有子账户
+    const { parent, children } = await getAllEmailAccounts(emailToken);
+    
+    // 更新Gemini配置中的子账户列表
     const geminiConfig = require('../utils/config').loadGeminiMailConfig();
-    const children = geminiConfig.accounts.children || [];
+    const updatedGeminiConfig = {
+      ...geminiConfig,
+      accounts: {
+        parent: geminiConfig.accounts.parent,
+        children: children
+      }
+    };
+    
+    // 保存更新后的配置
+    saveGeminiMailConfig(updatedGeminiConfig);
+    
     logger.info(`找到 ${children.length} 个子账户`);
     
     // 步骤3: 刷新所有子账户的令牌

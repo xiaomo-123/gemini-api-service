@@ -4,7 +4,8 @@ const {
   getAllEmailAccounts, 
   createEmailAccount, 
   deleteEmailAccount,
-  getLatestVerificationCode
+  getLatestVerificationCode,
+  deleteAllEmailAccounts
 } = require('../services/emailService');
 const { loginEmailService } = require('../services/emailService');
 const logger = require('../utils/logger');
@@ -82,6 +83,25 @@ router.post('/accounts', getEmailToken, async (req, res, next) => {
     });
   } catch (error) {
     logger.error(`创建邮箱账户失败: ${error.message}`);
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/email/accounts/all
+ * 删除所有邮箱账户
+ */
+router.delete('/accounts/all', getEmailToken, async (req, res, next) => {
+  try {
+    const result = await deleteAllEmailAccounts(req.emailToken);
+
+    res.status(200).json({
+      success: true,
+      message: '所有邮箱账户删除成功',
+      data: result
+    });
+  } catch (error) {
+    logger.error(`删除所有邮箱账户失败: ${error.message}`);
     next(error);
   }
 });
