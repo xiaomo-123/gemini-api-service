@@ -18,7 +18,8 @@ const app = express();
 app.use(helmet({
   crossOriginOpenerPolicy: false,
   originAgentCluster: false,
-  hsts: false
+  hsts: false,
+  contentSecurityPolicy: false
 }));
 
 // CORS配置
