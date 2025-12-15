@@ -1,0 +1,32 @@
+services:
+  gemini-api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gemini-api-service
+    ports:
+      - "3101:3101"
+    environment:
+      - PORT=3101
+      - NODE_ENV=production
+      - ALLOWED_ORIGINS=
+      - PUPPETEER_SKIP_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs    
+    user: "10001:10001"     
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"    
+    command: >
+      sh -c "tail -f /app/logs/combined.log /app/logs/error.log > /proc/1/fd/1 2>/proc/1/fd/2 & node app.js"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3101/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

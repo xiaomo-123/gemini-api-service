@@ -2,12 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 const logger = require('./utils/logger');
 
 // 导入路由
 const authRoutes = require('./routes/auth');
 const emailRoutes = require('./routes/email');
 const geminiRoutes = require('./routes/gemini');
+const configRoutes = require('./routes/config');
 
 // 创建Express应用
 const app = express();
@@ -25,6 +27,8 @@ app.use(cors({
 // 请求体解析
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+// 添加text/plain请求体解析
+app.use(express.text({ type: 'text/plain', limit: '10mb' }));
 
 // 速率限制
 const limiter = rateLimit({
@@ -51,10 +55,19 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 静态文件服务 - 提供web管理页面
+app.use('/web', express.static(path.join(__dirname, 'web')));
+
+// 主页重定向到管理页面
+app.get('/', (req, res) => {
+  res.redirect('/web');
+});
+
 // API路由
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/gemini', geminiRoutes);
+app.use('/api/config', configRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

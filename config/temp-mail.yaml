@@ -14,44 +14,20 @@ accounts:
     userId: 1
     isDel: 0
   children:
-    - accountId: 54
-      email: H2znWcdZIGEmOd6@artpayaws.site
-      name: H2znWcdZIGEmOd6
+    - accountId: 69
+      email: LcHGYRNQAhfXX1K@artpayaws.site
+      name: LcHGYRNQAhfXX1K
       status: 0
       latestEmailTime: null
-      createTime: '2025-12-14 03:45:07'
+      createTime: '2025-12-15 23:03:54'
       userId: 1
       isDel: 0
-    - accountId: 55
-      email: qAQZ7JN3O5mmsyz@artpayaws.site
-      name: qAQZ7JN3O5mmsyz
+    - accountId: 70
+      email: mbLolNwFTGrS4GR@artpayaws.site
+      name: mbLolNwFTGrS4GR
       status: 0
       latestEmailTime: null
-      createTime: '2025-12-14 03:45:07'
+      createTime: '2025-12-15 23:03:54'
       userId: 1
       isDel: 0
-    - accountId: 56
-      email: QcDhXKbXMKT49lt@artpayaws.site
-      name: QcDhXKbXMKT49lt
-      status: 0
-      latestEmailTime: null
-      createTime: '2025-12-14 03:45:07'
-      userId: 1
-      isDel: 0
-    - accountId: 57
-      email: 7C8vQmfrPCrY9JS@artpayaws.site
-      name: 7C8vQmfrPCrY9JS
-      status: 0
-      latestEmailTime: null
-      createTime: '2025-12-14 04:41:18'
-      userId: 1
-      isDel: 0
-    - accountId: 58
-      email: tzWBaZFChX62EYc@artpayaws.site
-      name: tzWBaZFChX62EYc
-      status: 0
-      latestEmailTime: null
-      createTime: '2025-12-14 04:41:18'
-      userId: 1
-      isDel: 0
-  lastUpdated: '2025-12-14T04:41:50.458Z'
+  lastUpdated: '2025-12-15T23:04:38.143Z'

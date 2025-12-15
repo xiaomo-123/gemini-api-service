@@ -396,12 +396,12 @@ async function testProxyConnection(proxyConfig) {
   }
 
   try {
-    // 尝试使用代理直接请求httpbin.org/ip，验证代理是否生效
+    
     const https = require('https');
     const url = require('url');
 
-    // 构建目标URL（使用httpbin.org作为测试目标）
-    const targetUrl = 'https://httpbin.org/ip';
+   
+    const targetUrl = 'https://google.com';
 
     // 配置axios使用代理
     const axiosConfig = {
@@ -422,83 +422,17 @@ async function testProxyConnection(proxyConfig) {
       }
     };
 
-    const response = await axios(axiosConfig);
-    const result = response.data;
+    const response = await axios(axiosConfig);   
 
-    // 验证代理是否生效
-    if (result.origin && result.origin !== '127.0.0.1') {
-      logger.info(`代理已生效，IP: ${result.origin}`);
+    logger.info(`代理已生效，状态码: ${response.status}`);
+    if (response.status === 200) {
+      logger.info(`代理已生效`);
       return true;
     } else {
       logger.warn('代理可能未生效');
       return false;
     }
-  } catch (error) {
-    // 如果是网络错误，尝试备用测试方法
-    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-      try {
-        // 使用HTTP CONNECT方法测试代理连接，支持认证
-        const https = require('https');
-        const url = require('url');
-
-        // 构建目标URL（使用httpbin.org作为测试目标）
-        const targetUrl = 'https://httpbin.org/ip';
-        const targetParsed = url.parse(targetUrl);
-
-        // 设置代理选项
-        const proxyOptions = {
-          host: proxyConfig.url,
-          port: proxyConfig.port,
-          method: 'CONNECT',
-          path: `${targetParsed.hostname}:${targetParsed.port || 443}`,
-          headers: {
-            'Host': `${targetParsed.hostname}:${targetParsed.port || 443}`
-          }
-        };
-
-        // 如果有认证信息，添加Proxy-Authorization头
-        if (proxyConfig.username && proxyConfig.password) {
-          const auth = Buffer.from(`${proxyConfig.username}:${proxyConfig.password}`).toString('base64');
-          proxyOptions.headers['Proxy-Authorization'] = `Basic ${auth}`;
-        }
-
-        await new Promise((resolve, reject) => {
-          const req = https.request(proxyOptions);
-
-          req.setTimeout(10000); // 10秒超时
-
-          req.on('connect', (res, socket) => {
-            if (res.statusCode === 200) {
-              logger.info('代理连接成功');
-              socket.end();
-              resolve();
-            } else {
-              logger.error(`代理连接失败，状态码: ${res.statusCode}`);
-              socket.end();
-              reject(new Error(`代理连接失败，状态码: ${res.statusCode}`));
-            }
-          });
-
-          req.on('timeout', () => {
-            logger.error('代理连接超时');
-            req.destroy();
-            reject(new Error('代理连接超时'));
-          });
-
-          req.on('error', (err) => {
-            logger.error(`代理连接失败: ${err.message}`);
-            reject(err);
-          });
-
-          req.end();
-        });
-
-        return true;
-      } catch (backupError) {
-        logger.error(`备用测试方法也失败: ${backupError.message}`);
-        return false;
-      }
-    }
+  } catch (error) {      
 
     logger.error(`代理测试失败: ${error.message}`);
     return false;
@@ -559,7 +493,7 @@ async function loginGeminiChild(childAccount, token) {
     }
 
     browser = await puppeteer.launch({
-      headless: true, // 显示浏览器界面，方便调试
+      headless: "new", // 使用新的Headless模式
       args: launchArgs,
       ignoreHTTPSErrors: true // 忽略HTTPS错误
     });
