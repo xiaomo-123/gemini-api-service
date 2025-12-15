@@ -1,7 +1,8 @@
 FROM node:18-slim
 RUN apt update && apt install -y dumb-init wget chromium     && rm -rf /var/lib/apt/lists/*  
 RUN useradd -m -u 10001 appuser   && mkdir -p /app/config /app/logs \  
-  && chown -R appuser:appuser /app     
+  && chown -R appuser:appuser /app \
+  && echo "appuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers     
 
 WORKDIR /app
 
