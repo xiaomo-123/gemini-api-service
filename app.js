@@ -15,7 +15,10 @@ const configRoutes = require('./routes/config');
 const app = express();
 
 // 安全中间件
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false
+}));
 
 // CORS配置
 app.use(cors({
