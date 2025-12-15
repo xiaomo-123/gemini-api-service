@@ -160,7 +160,7 @@ async function getEmailList(token, accountId, size = 5) {
         'Authorization': token
       }
     });
-
+    logger.info(`获取账户邮件列表: ${JSON.stringify(response.data, null, 2)}`);
     if (response.data.code !== 200) {
       throw new Error(`获取邮件列表失败: ${response.data.message || '未知错误'}`);
     }

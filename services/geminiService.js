@@ -360,13 +360,13 @@ function findGeminiVerificationCode(emailList) {
 async function waitForGeminiVerificationCode(token, accountId) {
   const maxRetries = 5;
   const retryDelay = 5000; // 5秒
- logger.info(`正在获取验证码 ${token}-------${accountId})`);
+ 
   for (let i = 0; i < maxRetries; i++) {
     logger.info(`正在获取验证码... (尝试 ${i + 1}/${maxRetries})`);
 
     try {
       const emailData = await getEmailList(token, accountId, 5);
-
+      
       if (emailData.list && emailData.list.length > 0) {
         const code = findGeminiVerificationCode(emailData.list);
         if (code) {
@@ -523,6 +523,9 @@ async function loginGeminiChild(childAccount, token) {
     logger.info(`   代理状态: ${proxyConfig.enabled ? '已启用' : '未启用'}`);
     let launchArgs = []
     
+    // 定义代理验证状态，确保在后续代码中可用
+    let proxyValid = false;
+    
     // 如果启用了代理，验证代理并添加代理相关参数
     if (proxyConfig.enabled) {
       logger.info(`   代理类型: ${proxyConfig.type}`);
@@ -538,7 +541,6 @@ async function loginGeminiChild(childAccount, token) {
       }
 
       // 验证代理是否可用
-      let proxyValid = false;
       try {
         proxyValid = await testProxyConnection(proxyConfig);
       } catch (error) {
@@ -557,7 +559,7 @@ async function loginGeminiChild(childAccount, token) {
     }
 
     browser = await puppeteer.launch({
-      headless: false, // 显示浏览器界面，方便调试
+      headless: true, // 显示浏览器界面，方便调试
       args: launchArgs,
       ignoreHTTPSErrors: true // 忽略HTTPS错误
     });
@@ -586,7 +588,7 @@ async function loginGeminiChild(childAccount, token) {
     const emailSelector = '#email-input';
     await page.waitForSelector(emailSelector);
     await page.type(emailSelector, childAccount.email);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // 4. 点击下一步按钮
     logger.info(`   ⏳ 点击下一步按钮...`);
@@ -603,8 +605,7 @@ async function loginGeminiChild(childAccount, token) {
     logger.info(`   ⏳ 等待邮件发送（10秒）...`);
     await new Promise(resolve => setTimeout(resolve, 10000));
 
-    // 7. 自动从邮箱获取验证码
-    
+    // 7. 自动从邮箱获取验证码    
     
     const verificationCode = await waitForGeminiVerificationCode(token, childAccount.accountId);
 
