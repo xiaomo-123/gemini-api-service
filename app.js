@@ -5,6 +5,16 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const logger = require('./utils/logger');
 
+// 全局禁用 IPv6
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
+// 设置 Node.js 默认使用 IPv4
+const { setDefaultAutoSelectFamily, setDefaultAutoSelectFamilyAttemptTimeout } = require('net');
+setDefaultAutoSelectFamily(false);
+// 设置一个合理的超时值，单位是毫秒，最小值为1
+setDefaultAutoSelectFamilyAttemptTimeout(100);
+
 // 导入路由
 const authRoutes = require('./routes/auth');
 const emailRoutes = require('./routes/email');
@@ -105,8 +115,9 @@ app.use((err, req, res, next) => {
 
 // 启动服务器
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Gemini API服务已启动，端口: ${PORT}`);
+  logger.info(`服务器已配置为仅使用 IPv4`);
 });
 
 // 优雅关闭

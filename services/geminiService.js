@@ -398,34 +398,31 @@ async function testProxyConnection(proxyConfig) {
   try {
     
     const https = require('https');
-    const url = require('url');
-
-   
-    // 输出代理配置信息用于调试
-    logger.info(`🔍 代理配置详情:`);
-    logger.info(`   类型: ${proxyConfig.type}`);
-    logger.info(`   地址: ${proxyConfig.url}`);
-    logger.info(`   端口: ${proxyConfig.port}`);
-    logger.info(`   用户名: ${proxyConfig.username || '未设置'}`);
-    logger.info(`   密码: ${proxyConfig.password || '未设置'}`);
+    const url = require('url');   
 
     const targetUrl = 'https://www.google.com';
+    logger.info(`🌐 测试目标URL: ${targetUrl}`);
+
+    // 先构建代理URL
+    let proxyUrl;
+    if (proxyConfig.username && proxyConfig.password) {
+      proxyUrl = `${proxyConfig.type}://${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@${proxyConfig.url}:${proxyConfig.port}`;
+    } else {
+      proxyUrl = `${proxyConfig.type}://${proxyConfig.url}:${proxyConfig.port}`;
+    }
+    logger.info(`🌐 使用代理URL: ${proxyUrl.replace(/:[^:]*@/, ':***@')}`); // 隐藏密码
 
     // 配置axios使用代理
     const axiosConfig = {
       method: 'get',
       url: targetUrl,
-      // maxRedirects: 5, // 允许重定向，类似curl的-L参数
-      // validateStatus: function (status) {
-      //   // 接受所有状态码作为有效响应
-      //   return status >= 200 && status < 600;
-      // },
+      // 添加代理配置
+      proxy: proxyUrl,
+      // 添加HTTPS代理配置
       httpsAgent: new https.Agent({
         rejectUnauthorized: false // 忽略证书验证
       }),
       timeout: 15000, // 15秒超时
-      // 使用完整的代理URL，类似于curl命令格式
-      proxy: `${proxyConfig.type}://${proxyConfig.username}:${proxyConfig.password}@${proxyConfig.url}:${proxyConfig.port}`,
       // 彻底解决IPv6连接问题
       family: 4, // 强制使用IPv4
       // 禁用DNS缓存，防止连接复用问题
@@ -578,16 +575,15 @@ async function loginGeminiChild(childAccount, token) {
     let proxyValid = false;
     
     // 如果启用了代理，验证代理并添加代理相关参数
-    if (proxyConfig.enabled) {
-      logger.info(`   代理类型: ${proxyConfig.type}`);
-      logger.info(`   代理地址: ${proxyConfig.url}:${proxyConfig.port}`);
-      logger.info(`   认证信息: ${proxyConfig.username}:${proxyConfig.password}`);
+    if (proxyConfig.enabled) {     
 
       // 根据代理类型构建代理服务器URL
+      // 使用更稳定的代理配置方式
       let proxyServer;
       if (proxyConfig.type === 'socks5') {
         proxyServer = `socks5://${proxyConfig.url}:${proxyConfig.port}`;
       } else {
+        // 对于HTTP代理，不包含认证信息，认证信息通过page.authenticate设置
         proxyServer = `${proxyConfig.type}://${proxyConfig.url}:${proxyConfig.port}`;
       }
 
@@ -601,22 +597,34 @@ async function loginGeminiChild(childAccount, token) {
       // 只有在代理验证通过时才添加代理参数
       if (proxyValid) {
         // 添加代理参数
-        launchArgs.push(`--proxy-server=${proxyServer}`);
-        logger.info(`   ✓ 已添加代理参数: ${proxyServer}`);
+        // 对于HTTP代理，不包含认证信息，认证信息通过page.authenticate设置
+        const displayProxyServer = proxyConfig.type === 'socks5' 
+          ? proxyServer 
+          : `${proxyConfig.type}://${proxyConfig.url}:${proxyConfig.port}`;
+        
+        // 添加代理相关参数
+        launchArgs.push(`--proxy-server=${displayProxyServer}`);
+        // 添加更多代理相关参数，确保代理连接稳定
+        launchArgs.push(`--proxy-bypass-list=<-loopback>`);
+        launchArgs.push(`--ignore-certificate-errors`);
+        
+        logger.info(`   ✓ 已添加代理参数: ${displayProxyServer}`);
+        logger.info(`   ✓ 已添加代理绕过列表: <-loopback>`);
       } else {
         logger.info(`   ⚠️ 代理验证失败，将不使用代理继续执行`);
         logger.info(`   💡 提示: 如果需要使用代理，请检查代理配置或网络连接`);
       }
     }
 
-    // 打印launchArgs代理信息
-    // logger.info(`   📋 浏览器启动参数 (launchArgs):`);
-    // if (launchArgs.length > 0) {
-    //   launchArgs.forEach((arg, index) => {
+    // 打印代理相关的启动参数
+    // logger.info(`   📋 浏览器代理相关启动参数:`);
+    // const proxyArgs = launchArgs.filter(arg => arg.includes('proxy') || arg.includes('--disable-ipv6') || arg.includes('--host-resolver-rules'));
+    // if (proxyArgs.length > 0) {
+    //   proxyArgs.forEach((arg, index) => {
     //     logger.info(`      ${index + 1}. ${arg}`);
     //   });
     // } else {
-    //   logger.info(`      (无特殊参数)`);
+    //   logger.info(`      (无代理相关参数)`);
     // }
 
     browser = await puppeteer.launch({
@@ -627,6 +635,20 @@ async function loginGeminiChild(childAccount, token) {
     });
 
     const page = await browser.newPage();
+    
+    // 对于HTTP代理，需要在页面创建后立即设置认证信息
+    if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password && proxyValid) {
+      try {
+        await page.authenticate({
+          username: proxyConfig.username,
+          password: proxyConfig.password
+        });
+        logger.info(`   ✓ 代理认证已设置`);
+      } catch (authError) {
+        logger.error(`   ✗ 代理认证设置失败: ${authError.message}`);
+        throw new Error(`代理认证失败: ${authError.message}`);
+      }
+    }
 
     // 定义多个不同的 UserAgent，用于随机选择
     const userAgents = [
@@ -646,14 +668,7 @@ async function loginGeminiChild(childAccount, token) {
     // 设置用户代理，避免被识别为机器人
     await page.setUserAgent(randomUserAgent);
 
-    // 对于HTTP代理，需要单独设置认证信息
-    if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password && proxyValid) {
-      await page.authenticate({
-        username: proxyConfig.username,
-        password: proxyConfig.password
-      });
-      logger.info(`   ✓ 代理认证已设置`);
-    }
+    // 代理认证已在页面创建后立即设置，无需重复设置
 
     // 2. 访问 Gemini 登录页面
     logger.info(`   ⏳ 访问 Gemini 登录页面...`);
