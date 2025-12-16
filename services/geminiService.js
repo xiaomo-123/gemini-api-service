@@ -571,7 +571,7 @@ async function loginGeminiChild(childAccount, token) {
     ]
     
     // 定义代理验证状态，确保在后续代码中可用
-    let proxyValid = false;
+    let proxyValid = true;
     
     // 如果启用了代理，验证代理并添加代理相关参数
     if (proxyConfig.enabled) {     
@@ -588,7 +588,7 @@ async function loginGeminiChild(childAccount, token) {
 
       // 验证代理是否可用
       try {
-        proxyValid = await testProxyConnection(proxyConfig);
+        await testProxyConnection(proxyConfig);
       } catch (error) {
         logger.info(`   ⚠️ 代理验证出错: ${error.message}`);
       }
