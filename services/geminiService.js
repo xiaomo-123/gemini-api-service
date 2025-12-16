@@ -455,7 +455,81 @@ async function loginGeminiChild(childAccount, token) {
     // 获取代理配置
     const proxyConfig = getProxyConfig();
     logger.info(`   代理状态: ${proxyConfig.enabled ? '已启用' : '未启用'}`);
-    let launchArgs = []
+    
+    // 创建和准备用户数据目录
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    
+    // 根据操作系统创建临时目录路径
+    const tempDir = os.tmpdir();
+    const userDataDir = path.join(tempDir, `chrome_user_data_${Date.now()}`);
+    
+    // 确保目录存在，如果已存在则清空内容
+    if (fs.existsSync(userDataDir)) {
+      // 清空目录内容
+      const files = fs.readdirSync(userDataDir);
+      for (const file of files) {
+        const filePath = path.join(userDataDir, file);
+        const stat = fs.statSync(filePath);
+        
+        if (stat.isDirectory()) {
+          // 递归删除子目录
+          fs.rmSync(filePath, { recursive: true, force: true });
+        } else {
+          // 删除文件
+          fs.unlinkSync(filePath);
+        }
+      }
+      logger.info(`   🧹 已清空用户数据目录: ${userDataDir}`);
+    } else {
+      // 创建新目录
+      fs.mkdirSync(userDataDir, { recursive: true });
+      logger.info(`   📁 已创建用户数据目录: ${userDataDir}`);
+    }
+    
+    // 初始化启动参数，添加防止被检测的参数
+    let launchArgs = [
+      `--user-data-dir=${userDataDir}`,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-infobars',
+      '--window-position=0,0',
+      '--ignore-certifcate-errors',
+      '--ignore-certifcate-errors-spki-list',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-images',
+      '--disable-default-apps',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--no-default-browser-check',
+      '--no-first-run',
+      '--disable-component-extensions-with-background-pages',
+      '--single-process',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--disable-software-rasterizer',
+      '--disable-web-security',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection',
+      '--disable-logging',
+      '--disable-notifications',
+      '--disable-permissions-api',
+      '--disable-web-resources',
+      '--disable-features=AudioServiceOutOfProcess',
+      '--password-store=basic',
+      '--use-mock-keychain',
+      '--lang=zh-CN,zh;q=0.9,en;q=0.8',
+      '--window-size=1920,1080',
+      `--remote-debugging-port=${Math.floor(Math.random() * 10000) + 9000}`
+    ]
     
     // 定义代理验证状态，确保在后续代码中可用
     let proxyValid = false;
@@ -492,16 +566,42 @@ async function loginGeminiChild(childAccount, token) {
       }
     }
 
+    // 打印launchArgs代理信息
+    // logger.info(`   📋 浏览器启动参数 (launchArgs):`);
+    // if (launchArgs.length > 0) {
+    //   launchArgs.forEach((arg, index) => {
+    //     logger.info(`      ${index + 1}. ${arg}`);
+    //   });
+    // } else {
+    //   logger.info(`      (无特殊参数)`);
+    // }
+
     browser = await puppeteer.launch({
       headless: "new", // 使用新的Headless模式
+      // headless: false, // 使用新的Headless模式
       args: launchArgs,
       ignoreHTTPSErrors: true // 忽略HTTPS错误
     });
 
     const page = await browser.newPage();
 
+    // 定义多个不同的 UserAgent，用于随机选择
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ];
+    
+    // 随机选择一个 UserAgent
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    logger.info(`   🌐 使用随机 UserAgent: ${randomUserAgent}`);
+    
     // 设置用户代理，避免被识别为机器人
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    await page.setUserAgent(randomUserAgent);
 
     // 对于HTTP代理，需要单独设置认证信息
     if (proxyConfig.enabled && proxyConfig.type !== 'socks5' && proxyConfig.username && proxyConfig.password && proxyValid) {
