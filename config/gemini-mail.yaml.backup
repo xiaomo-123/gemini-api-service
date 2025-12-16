@@ -1,0 +1,53 @@
+poolApiUrl: http://127.0.0.1:8000
+password: '1'
+accounts:
+  parent:
+    accountId: 1
+    email: admin@artpayaws.site
+    name: admin
+    status: 0
+    latestEmailTime: null
+    createTime: '2025-12-04 11:14:14'
+    userId: 1
+    isDel: 0
+  children:
+    - accountId: 97
+      email: SZ9zQ7s8xbRRcCy@artpayaws.site
+      name: SZ9zQ7s8xbRRcCy
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-16 04:23:48'
+      userId: 1
+      isDel: 0
+    - accountId: 98
+      email: V82Cet9VeBv08wC@artpayaws.site
+      name: V82Cet9VeBv08wC
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-16 04:23:48'
+      userId: 1
+      isDel: 0
+    - accountId: 99
+      email: maolXV5xyQ080Pf@artpayaws.site
+      name: maolXV5xyQ080Pf
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-16 04:23:48'
+      userId: 1
+      isDel: 0
+    - accountId: 100
+      email: 5DVM6JQZofiG7Qv@artpayaws.site
+      name: 5DVM6JQZofiG7Qv
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-16 04:23:48'
+      userId: 1
+      isDel: 0
+    - accountId: 101
+      email: MN2uLgeBkdo9J9K@artpayaws.site
+      name: MN2uLgeBkdo9J9K
+      status: 0
+      latestEmailTime: null
+      createTime: '2025-12-16 04:23:48'
+      userId: 1
+      isDel: 0

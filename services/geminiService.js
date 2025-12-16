@@ -532,39 +532,39 @@ async function loginGeminiChild(childAccount, token) {
       '--disable-setuid-sandbox',
       // 强制使用IPv4
      
-      '--disable-infobars',
-      '--window-position=0,0',
-      '--ignore-certifcate-errors',
-      '--ignore-certifcate-errors-spki-list',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-extensions',
-      '--disable-plugins',
-      '--disable-images',
-      '--disable-default-apps',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-background-networking',
-      '--disable-sync',
-      '--metrics-recording-only',
-      '--no-default-browser-check',
-      '--no-first-run',
-      '--disable-component-extensions-with-background-pages',
-      '--single-process',
-      '--disable-gpu',
-      '--disable-dev-shm-usage',
-      '--disable-software-rasterizer',
-      '--disable-web-security',
-      '--disable-features=TranslateUI',
-      '--disable-ipc-flooding-protection',
-      '--disable-logging',
-      '--disable-notifications',
-      '--disable-permissions-api',
-      '--disable-web-resources',
-      '--disable-features=AudioServiceOutOfProcess',
-      '--password-store=basic',
-      '--use-mock-keychain',
+      // '--disable-infobars',
+      // '--window-position=0,0',
+      // '--ignore-certifcate-errors',
+      // '--ignore-certifcate-errors-spki-list',
+      // '--disable-blink-features=AutomationControlled',
+      // '--disable-features=VizDisplayCompositor',
+      // '--disable-extensions',
+      // '--disable-plugins',
+      // '--disable-images',
+      // '--disable-default-apps',
+      // '--disable-background-timer-throttling',
+      // '--disable-backgrounding-occluded-windows',
+      // '--disable-renderer-backgrounding',
+      // '--disable-background-networking',
+      // '--disable-sync',
+      // '--metrics-recording-only',
+      // '--no-default-browser-check',
+      // '--no-first-run',
+      // '--disable-component-extensions-with-background-pages',
+      // '--single-process',
+      // '--disable-gpu',
+      // '--disable-dev-shm-usage',
+      // '--disable-software-rasterizer',
+      // '--disable-web-security',
+      // '--disable-features=TranslateUI',
+      // '--disable-ipc-flooding-protection',
+      // '--disable-logging',
+      // '--disable-notifications',
+      // '--disable-permissions-api',
+      // '--disable-web-resources',
+      // '--disable-features=AudioServiceOutOfProcess',
+      // '--password-store=basic',
+      // '--use-mock-keychain',
       '--lang=zh-CN,zh;q=0.9,en;q=0.8',
       '--window-size=1920,1080',
       `--remote-debugging-port=${Math.floor(Math.random() * 10000) + 9000}`
@@ -627,8 +627,8 @@ async function loginGeminiChild(childAccount, token) {
     // }
 
     browser = await puppeteer.launch({
-      headless: "new", // 使用新的Headless模式
-      // headless: false, // 使用新的Headless模式
+      // headless: "new", // 使用新的Headless模式
+      headless: false, // 使用新的Headless模式
       args: launchArgs,
       ignoreHTTPSErrors: true // 忽略HTTPS错误
     });
@@ -686,7 +686,12 @@ async function loginGeminiChild(childAccount, token) {
     const nextButtonSelector = '#log-in-button';
     await page.click(nextButtonSelector);
     await new Promise(resolve => setTimeout(resolve, 3000));
-
+// 2. 点击按钮
+      // logger.info(`   ⏳ 风控点击按钮...`);
+      // const ButtonSelector = '#yDmH0d > c-wiz > div > div > div > div > div > div > div > div > div > div > div > button > span.AeBiU-RLmnJb';
+      // await page.waitForSelector(emailSelector);
+      // await page.click(ButtonSelector)
+      // await new Promise(resolve => setTimeout(resolve, 3000));
     // 5. 等待验证码输入框出现
     logger.info(`   ⏳ 等待验证码输入框...`);
     const verificationCodeSelector = 'input[name="pinInput"]';
@@ -947,6 +952,13 @@ async function updateGeminiPool() {
       logger.error('gemini-mail.yaml 中没有子账户，请先选择账户');
       return;
     }
+    
+    // 检查是否所有账号都已标记无token
+    const allAccountsSkipped = accounts.children.every(child => !child.tokens || child.skipReason);
+    if (allAccountsSkipped) {
+      logger.info('所有账号都已标记无token，跳过更新Gemini Pool操作');
+      return { totalCount: 0, skippedAll: true };
+    }
     logger.info('登录获取 token...',poolApiUrl, password);
     // 2. 登录获取 token
     const adminToken = await loginGeminiPool(poolApiUrl, password);
@@ -1090,6 +1102,16 @@ async function cleanInvalidAccounts() {
 
     if (!password) {
       throw new Error('gemini-mail.yaml 中未配置密码');
+    }
+    
+    // 检查是否所有账号都已标记无token
+    const configAccounts = config.accounts;
+    if (configAccounts.children && configAccounts.children.length > 0) {
+      const allAccountsSkipped = configAccounts.children.every(child => !child.tokens || child.skipReason);
+      if (allAccountsSkipped) {
+        logger.info('所有账号都已标记无token，跳过清理无效账户操作');
+        return { validCount: 0, invalidCount: 0, skippedAll: true };
+      }
     }
 
     logger.info('正在登录 Gemini Pool 平台...');

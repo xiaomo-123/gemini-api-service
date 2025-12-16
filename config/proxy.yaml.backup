@@ -1,0 +1,7 @@
+proxy:  
+  enabled: true  
+  type: 'http'  
+  url: 'us.922s5.net' 
+  port: 6300  
+  username: '10612568jK-zone-custom-sessid-EeY3boKL'  
+  password: 'PelENhew'
