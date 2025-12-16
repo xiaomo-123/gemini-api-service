@@ -13,11 +13,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --production  
 COPY . .
+# 确保所有文件和目录的所有权都正确设置为 appuser
 RUN chown -R appuser:appuser /app
+# 修复权限问题，确保 appuser 有执行权限
+RUN chmod -R 755 /app
 
 EXPOSE 3101
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3   CMD wget -qO- http://127.0.0.1:3101/health || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "sysctl -w net.ipv6.conf.all.disable_ipv6=1 && sysctl -w net.ipv6.conf.default.disable_ipv6=1 && su -s /bin/sh appuser -c node app.js"]
+CMD ["sh", "-c", "sysctl -w net.ipv6.conf.all.disable_ipv6=1 && sysctl -w net.ipv6.conf.default.disable_ipv6=1 && chown -R appuser:appuser /app/config /app/logs && chmod -R 755 /app/config /app/logs && su -s /bin/sh appuser -c node app.js"]

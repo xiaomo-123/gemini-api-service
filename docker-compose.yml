@@ -29,7 +29,7 @@ services:
         max-size: "100m"
         max-file: "3"    
     command: >
-      sh -c "mkdir -p /app/logs/uvicorn && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log && tail -f /app/logs/combined.log /app/logs/error.log > /proc/1/fd/1 2>/proc/1/fd/2 &"
+      sh -c "mkdir -p /app/logs/uvicorn && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log && chown -R appuser:appuser /app/logs && chmod -R 755 /app/logs && tail -f /app/logs/combined.log /app/logs/error.log > /proc/1/fd/1 2>/proc/1/fd/2 &"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3101/health"]
