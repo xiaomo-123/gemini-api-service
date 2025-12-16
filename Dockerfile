@@ -1,6 +1,7 @@
 FROM node:18-slim
 RUN apt update && apt install -y dumb-init wget chromium     && rm -rf /var/lib/apt/lists/*  
-RUN useradd -m -u 10001 appuser   && mkdir -p /app/config /app/logs \  
+RUN useradd -m -u 10001 appuser   && mkdir -p /app/config /app/logs /app/logs/uvicorn \  
+  && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log \
   && chown -R appuser:appuser /app \
   && echo "appuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers     
 
