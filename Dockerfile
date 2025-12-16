@@ -1,10 +1,14 @@
 FROM node:18-slim
 RUN apt update && apt install -y dumb-init wget chromium     && rm -rf /var/lib/apt/lists/*
-# 禁用 IPv6 - 使用容器启动时的方式
+# 彻底禁用 IPv6
 RUN echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf && \
     echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf && \
     echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.conf && \
-    echo "net.ipv6.conf.eth0.disable_ipv6 = 1" >> /etc/sysctl.conf  
+    echo "net.ipv6.conf.eth0.disable_ipv6 = 1" >> /etc/sysctl.conf && \
+    echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.d/99-disable-ipv6.conf && \
+    echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.d/99-disable-ipv6.conf && \
+    echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.d/99-disable-ipv6.conf && \
+    echo "net.ipv6.conf.eth0.disable_ipv6 = 1" >> /etc/sysctl.d/99-disable-ipv6.conf  
 RUN useradd -m -u 10001 appuser   && mkdir -p /app/config /app/logs /app/logs/uvicorn \  
   && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log \
   && chown -R appuser:appuser /app \
