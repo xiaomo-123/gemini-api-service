@@ -16,8 +16,10 @@ services:
     volumes:
       - ./config:/app/config
       - ./logs:/app/logs    
-    user: "10001:10001"
     privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
     network_mode: "bridge"
     extra_hosts:
       - "host.docker.internal:host-gateway"     
@@ -27,7 +29,7 @@ services:
         max-size: "100m"
         max-file: "3"    
     command: >
-      sh -c "mkdir -p /app/logs/uvicorn && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log && tail -f /app/logs/combined.log /app/logs/error.log > /proc/1/fd/1 2>/proc/1/fd/2 & node app.js"
+      sh -c "mkdir -p /app/logs/uvicorn && touch /app/logs/uvicorn/access.log /app/logs/uvicorn/error.log /app/logs/combined.log /app/logs/error.log && tail -f /app/logs/combined.log /app/logs/error.log > /proc/1/fd/1 2>/proc/1/fd/2 &"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3101/health"]
