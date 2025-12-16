@@ -531,8 +531,7 @@ async function loginGeminiChild(childAccount, token) {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       // 强制使用IPv4
-      '--disable-ipv6',
-      '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost',
+     
       '--disable-infobars',
       '--window-position=0,0',
       '--ignore-certifcate-errors',
