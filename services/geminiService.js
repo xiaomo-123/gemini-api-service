@@ -407,7 +407,7 @@ async function testProxyConnection(proxyConfig) {
     logger.info(`   地址: ${proxyConfig.url}`);
     logger.info(`   端口: ${proxyConfig.port}`);
     logger.info(`   用户名: ${proxyConfig.username || '未设置'}`);
-    logger.info(`   密码: ${proxyConfig.password ? '已设置' : '未设置'}`);
+    logger.info(`   密码: ${proxyConfig.password || '未设置'}`);
 
     const targetUrl = 'https://www.google.com';
 
@@ -415,11 +415,11 @@ async function testProxyConnection(proxyConfig) {
     const axiosConfig = {
       method: 'get',
       url: targetUrl,
-      maxRedirects: 5, // 允许重定向，类似curl的-L参数
-      validateStatus: function (status) {
-        // 接受所有状态码作为有效响应
-        return status >= 200 && status < 600;
-      },
+      // maxRedirects: 5, // 允许重定向，类似curl的-L参数
+      // validateStatus: function (status) {
+      //   // 接受所有状态码作为有效响应
+      //   return status >= 200 && status < 600;
+      // },
       httpsAgent: new https.Agent({
         rejectUnauthorized: false // 忽略证书验证
       }),
@@ -427,13 +427,13 @@ async function testProxyConnection(proxyConfig) {
       // 使用完整的代理URL，类似于curl命令格式
       proxy: `${proxyConfig.type}://${proxyConfig.username}:${proxyConfig.password}@${proxyConfig.url}:${proxyConfig.port}`,
       // 解决IPv6连接问题
-      family: 4, // 强制使用IPv4
+      // family: 4, // 强制使用IPv4
       // 禁用DNS缓存，防止连接复用问题
       dnsCache: false,
       // 禁用keep-alive，防止连接复用问题
       keepAlive: false,
       // 设置本地地址为0.0.0.0，避免绑定到IPv6地址
-      localAddress: '0.0.0.0',
+      // localAddress: '0.0.0.0',
       // 添加更多请求头，模拟真实浏览器
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
