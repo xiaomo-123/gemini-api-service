@@ -427,7 +427,7 @@ async function testProxyConnection(proxyConfig) {
       // 使用完整的代理URL，类似于curl命令格式
       proxy: `${proxyConfig.type}://${proxyConfig.username}:${proxyConfig.password}@${proxyConfig.url}:${proxyConfig.port}`,
       // 解决IPv6连接问题
-      // family: 4, // 强制使用IPv4
+      family: 4, // 强制使用IPv4
       // 禁用DNS缓存，防止连接复用问题
       dnsCache: false,
       // 禁用keep-alive，防止连接复用问题
