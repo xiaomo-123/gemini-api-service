@@ -401,35 +401,63 @@ async function testProxyConnection(proxyConfig) {
     const url = require('url');
 
    
-    const targetUrl = 'https://google.com';
+    // 输出代理配置信息用于调试
+    logger.info(`🔍 代理配置详情:`);
+    logger.info(`   类型: ${proxyConfig.type}`);
+    logger.info(`   地址: ${proxyConfig.url}`);
+    logger.info(`   端口: ${proxyConfig.port}`);
+    logger.info(`   用户名: ${proxyConfig.username || '未设置'}`);
+    logger.info(`   密码: ${proxyConfig.password ? '已设置' : '未设置'}`);
+
+    const targetUrl = 'https://www.google.com';
 
     // 配置axios使用代理
     const axiosConfig = {
       method: 'get',
       url: targetUrl,
+      maxRedirects: 5, // 允许重定向，类似curl的-L参数
+      validateStatus: function (status) {
+        // 接受所有状态码作为有效响应
+        return status >= 200 && status < 600;
+      },
       httpsAgent: new https.Agent({
         rejectUnauthorized: false // 忽略证书验证
       }),
       timeout: 15000, // 15秒超时
-      proxy: {
-        protocol: proxyConfig.type,
-        host: proxyConfig.url,
-        port: proxyConfig.port,
-        auth: proxyConfig.username && proxyConfig.password ? {
-          username: proxyConfig.username,
-          password: proxyConfig.password
-        } : undefined
+      // 使用完整的代理URL，类似于curl命令格式
+      proxy: `${proxyConfig.type}://${proxyConfig.username}:${proxyConfig.password}@${proxyConfig.url}:${proxyConfig.port}`,
+      // 添加更多请求头，模拟真实浏览器
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1'
       }
     };
 
     const response = await axios(axiosConfig);   
 
-    logger.info(`代理已生效，状态码: ${response.status}`);
-    if (response.status === 200) {
+    logger.info(`🌐 代理测试结果，状态码: ${response.status}`);
+    // 接受2xx和3xx状态码作为成功
+    if (response.status >= 200 && response.status < 400) {
       logger.info(`代理已生效`);
       return true;
     } else {
-      logger.warn('代理可能未生效');
+      logger.warn(`⚠️ 代理可能未生效，状态码: ${response.status}`);
+      // 如果是400错误，可能是代理配置问题
+      if (response.status === 400) {
+        logger.warn(`💡 状态码400通常表示代理配置问题，请检查以下内容:`);
+        logger.warn(`   - 代理服务器地址和端口是否正确`);
+        logger.warn(`   - 用户名和密码是否正确`);
+        logger.warn(`   - 代理类型是否正确 (http/https/socks5)`);
+      }
       return false;
     }
   } catch (error) {      

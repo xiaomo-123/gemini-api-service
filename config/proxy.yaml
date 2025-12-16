@@ -1,7 +1,7 @@
 proxy:  
   enabled: true  
   type: 'http'  
-  url: '138.124.123.18' 
-  port: 25565  
-  username: ''  
-  password: ''
+  url: 'us.922s5.net' 
+  port: 6300  
+  username: '10612568jK-zone-custom-sessid-EeY3boKL'  
+  password: 'PelENhew'
