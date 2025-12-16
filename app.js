@@ -114,7 +114,7 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3101;
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Gemini API服务已启动，端口: ${PORT}`);
   logger.info(`服务器已配置为仅使用 IPv4`);
