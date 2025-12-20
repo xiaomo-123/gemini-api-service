@@ -680,19 +680,59 @@ async function loginGeminiChild(childAccount, token) {
     await page.waitForSelector(emailSelector);
     await page.type(emailSelector, childAccount.email);
     await new Promise(resolve => setTimeout(resolve, 2000));
-
+    
     // 4. 点击下一步按钮
     logger.info(`   ⏳ 点击下一步按钮...`);
     const nextButtonSelector = '#log-in-button';
     await page.click(nextButtonSelector);
     await new Promise(resolve => setTimeout(resolve, 3000));
+   
 // 2. 点击按钮
-      // logger.info(`   ⏳ 风控点击按钮...`);
-      // const ButtonSelector = '#yDmH0d > c-wiz > div > div > div > div > div > div > div > div > div > div > div > button > span.AeBiU-RLmnJb';
-      // await page.waitForSelector(emailSelector);
-      // await page.click(ButtonSelector)
+      logger.info(`   ⏳ 风控点击按钮...`);
+      const ButtonSelector = 'button[jsname="clYohf"]';
+      let buttonClicked = false; // 添加标签变量，默认为false
+      
+      // 尝试处理可能出现的多个风控按钮
+      for (let i = 0; i < 3; i++) {
+        try {
+          await page.waitForSelector(ButtonSelector, { timeout: 5000 });
+          const buttons = await page.$$(ButtonSelector);
+          
+          if (buttons.length > 0) {
+            // 点击第一个按钮
+            await buttons[0].click();
+            buttonClicked = true;
+            logger.info(`   ✓ 成功点击风控按钮 (第${i + 1}次)`);
+            logger.info(`   🏷️ 按钮点击状态: ${buttonClicked}`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // 成功点击风控按钮后立即执行邮箱填写和下一步操作
+            logger.info(`   ⏳ 填入邮箱...`);
+            const emailSelector = '#email-input';
+            await page.waitForSelector(emailSelector);
+            await page.type(emailSelector, childAccount.email);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // 4. 点击下一步按钮
+            logger.info(`   ⏳ 点击下一步按钮...`);
+            const nextButtonSelector = '#log-in-button';
+            await page.click(nextButtonSelector);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+          } else {
+            break;
+          }
+        } catch (error) {
+          if (i === 0) {
+            logger.info(`   ⚠️ 未找到风控按钮或点击失败，继续执行`);
+            logger.info(`   🏷️ 按钮点击状态: ${buttonClicked}`);
+          }
+          break;
+        }
+      }
       // await new Promise(resolve => setTimeout(resolve, 3000));
     // 5. 等待验证码输入框出现
+     await new Promise(resolve => setTimeout(resolve, 1200000));
     logger.info(`   ⏳ 等待验证码输入框...`);
     const verificationCodeSelector = 'input[name="pinInput"]';
     await page.waitForSelector(verificationCodeSelector);
